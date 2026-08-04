@@ -236,7 +236,11 @@ label { font-size: 12px; color: var(--text-secondary); display: block; margin-bo
   cursor: pointer; user-select: none;
   padding: 3px 7px; border-radius: 6px;
   transition: background 0.12s ease;
+  font-family: var(--font-sans);
+  background: none;
+  border: none;
 }
+.legend-item:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
 .legend-item:hover { background: var(--page-alt); }
 .legend-item.inactive { opacity: 0.35; text-decoration: line-through; }
 .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }

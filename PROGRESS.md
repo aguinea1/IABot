@@ -8,7 +8,17 @@ El repositorio estaba vacío al arrancar, así que esta sesión ha inicializado
 toda la estructura del proyecto y ha completado el PRD de principio a fin.
 No hay trabajo previo que continuar.
 
-### Qué se hizo
+### Pulido adicional tras completar el PRD (misma sesión)
+
+Con tiempo de sobra tras terminar las 7 fases (~1h de las ~4h asignadas), se
+hizo una ronda extra: importar JSON (complemento a exportar), accesibilidad
+de teclado (leyenda como botones, panel lateral con foco/Escape/`role=dialog`),
+8 tests de integración adicionales con React Testing Library (total 24 tests
+en verde), y validación formal de la paleta de accesibilidad con el script
+del dataviz skill (todos los checks duros en PASS). Detalle completo en
+README.md, sección "Pasada de pulido adicional".
+
+### Qué se hizo (fases del PRD)
 
 **Fase 0 — Auditoría y testing automatizado**: dataset de prueba sintético de
 14 meses (`frontend/src/data/testData.js`) con el fondo "S&P 500" escrito de

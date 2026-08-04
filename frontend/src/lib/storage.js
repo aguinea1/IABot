@@ -30,3 +30,13 @@ export function exportStateAsJSON(state) {
 export function clearState() {
   localStorage.removeItem(KEY);
 }
+
+// Valida de forma básica que el JSON importado tiene la forma esperada
+// (assets[] / entries[]) antes de sustituir el estado actual.
+export function parseImportedState(jsonText) {
+  const data = JSON.parse(jsonText);
+  if (!data || !Array.isArray(data.assets) || !Array.isArray(data.entries)) {
+    throw new Error('El archivo no tiene el formato esperado (se esperan las claves "assets" y "entries").');
+  }
+  return data;
+}

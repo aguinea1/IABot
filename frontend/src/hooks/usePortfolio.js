@@ -48,7 +48,11 @@ export function usePortfolio() {
     setState(emptyState());
   }, []);
 
+  const importState = useCallback((data) => {
+    setState({ assets: data.assets || [], entries: data.entries || [] });
+  }, []);
+
   const duplicates = useMemo(() => findDuplicateAssets(state.assets), [state.assets]);
 
-  return { state, loading, addEntry, removeEntry, merge, loadDemoData, resetAll, duplicates };
+  return { state, loading, addEntry, removeEntry, merge, loadDemoData, resetAll, importState, duplicates };
 }

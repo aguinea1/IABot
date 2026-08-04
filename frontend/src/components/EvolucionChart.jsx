@@ -144,10 +144,17 @@ export default function EvolucionChart({ assets, entries, onAssetClick }) {
       </ResponsiveContainer>
       <div className="legend-row">
         {series.map(({ asset }, idx) => (
-          <div key={asset.id} className={`legend-item ${hidden.has(asset.id) ? 'inactive' : ''}`} onClick={() => toggleAsset(asset.id)}>
+          <button
+            key={asset.id}
+            type="button"
+            className={`legend-item ${hidden.has(asset.id) ? 'inactive' : ''}`}
+            onClick={() => toggleAsset(asset.id)}
+            aria-pressed={!hidden.has(asset.id)}
+            aria-label={`${hidden.has(asset.id) ? 'Mostrar' : 'Ocultar'} serie de ${asset.nombre}`}
+          >
             <span className="legend-dot" style={{ background: colorForIndex(idx) }} />
             {asset.nombre}
-          </div>
+          </button>
         ))}
       </div>
     </div>

@@ -1,8 +1,21 @@
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { porActivo } from '../lib/aggregations';
 import { fmtEUR, fmtPct, fmtMes } from '../lib/format';
 
 export default function PanelDetalleActivo({ assetId, assets, entries, onClose }) {
+  const closeBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (!assetId) return;
+    closeBtnRef.current?.focus();
+    function onKeyDown(e) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [assetId, onClose]);
+
   if (!assetId) return null;
   const asset = assets.find((a) => a.id === assetId);
   if (!asset) return null;
@@ -12,13 +25,13 @@ export default function PanelDetalleActivo({ assetId, assets, entries, onClose }
   return (
     <>
       <div className="side-panel-backdrop" onClick={onClose} />
-      <div className="side-panel">
+      <div className="side-panel" role="dialog" aria-modal="true" aria-label={`Detalle de ${asset.nombre}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <h2 style={{ fontFamily: 'var(--font-serif)', margin: 0 }}>{asset.nombre}</h2>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{asset.categoria}</div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
+          <button ref={closeBtnRef} onClick={onClose} aria-label="Cerrar panel de detalle" style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
         </div>
 
         <div className="kpi-grid" style={{ marginTop: 16, gridTemplateColumns: '1fr 1fr' }}>

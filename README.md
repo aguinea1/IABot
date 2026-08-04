@@ -178,8 +178,10 @@ cualquier variación de mayúsculas/espacios/símbolos creaba una serie nueva.
   del activo fusionado siguen cuadrando (verificado con test exacto sobre el
   S&P 500 del dataset de prueba).
 
-Ejecutar los tests: `cd frontend && npm run test` (16 tests, todos en verde
-a fecha de esta sesión).
+Ejecutar los tests: `cd frontend && npm run test` (24 tests, todos en verde
+a fecha de esta sesión: 16 de la capa de datos/métricas + 5 de integración
+de la app completa con React Testing Library + 3 de importación/exportación
+de JSON).
 
 ---
 
@@ -245,6 +247,38 @@ mediante un navegador headless (Playwright):
   Time-Weighted Return estricto con múltiples subperíodos, documentado en el
   tooltip de la métrica. Es una simplificación razonable dado que no se
   registra el timing exacto intramensual de cada aportación.
+
+## Pasada de pulido adicional (misma sesión, tras completar el PRD)
+
+Con tiempo de sesión de sobra tras terminar las 7 fases, se hizo una ronda
+extra de robustez:
+
+- **Paleta validada formalmente**: se ejecutó el validador de accesibilidad
+  de paletas de datos (`validate_palette.js`) sobre los 8 colores
+  categóricos usados en las gráficas — pasa todos los checks duros
+  (banda de luminosidad, suelo de croma, separación CVD, suelo de visión
+  normal); el único WARN (contraste de 3 colores por debajo de 3:1 sobre el
+  fondo claro) está mitigado como exige la norma: la leyenda siempre muestra
+  el nombre del activo en texto, nunca solo el color.
+- **Importar JSON**: además de "Exportar JSON" ya existente, se añadió
+  "Importar JSON" para restaurar un backup completo (`frontend/src/lib/storage.js`,
+  función `parseImportedState`, con validación básica de forma y mensajes de
+  error visibles en la UI si el archivo no es válido).
+- **Accesibilidad de teclado**: la leyenda de "Evolución por activo" ahora
+  son botones reales (`aria-pressed`, `aria-label`) en vez de `div`s con
+  `onClick`; el panel lateral de detalle es un `role="dialog"`, recibe el
+  foco al abrirse y se cierra con la tecla Escape.
+- **24 tests en verde** (antes 16): se añadieron tests de integración de la
+  app completa con React Testing Library (`frontend/src/__tests__/App.test.jsx`)
+  que cargan el dataset de Fase 0 dentro de la aplicación real y comprueban
+  que el fix del bug de duplicados también se sostiene a nivel de UI
+  (no solo a nivel de lógica de datos), y tests de importar/exportar JSON.
+- Se detectó y corrigió un bug de timing de `ResponsiveContainer` de
+  Recharts (algunas gráficas podían tardar en pintarse del todo en el primer
+  render) y un bug real introducido al probar `manualChunks` de Rollup para
+  reducir el tamaño del bundle (chunks circulares rompían React en runtime)
+  — revertido a un bundle único, estable aunque algo más pesado (~710 KB sin
+  comprimir, ~208 KB gzip).
 
 ## Pendiente / próximos pasos sugeridos
 

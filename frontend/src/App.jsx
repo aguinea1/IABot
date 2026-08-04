@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, Upload, RefreshCw, Trash2 } from 'lucide-react';
 
 import { usePortfolio } from './hooks/usePortfolio';
 import { KpiSkeleton, ChartSkeleton } from './components/Skeleton';
@@ -18,7 +18,7 @@ import AsesorIA from './components/AsesorIA';
 
 import { rendimientoTotal, totalMensual } from './lib/aggregations';
 import { cagr, volatilidadMensual, maxDrawdown, hhi, FORMULAS } from './lib/metrics';
-import { exportStateAsJSON } from './lib/storage';
+import { exportStateAsJSON, parseImportedState } from './lib/storage';
 import { fmtEUR, fmtPct } from './lib/format';
 
 const TABS = [
@@ -29,10 +29,11 @@ const TABS = [
 ];
 
 export default function App() {
-  const { state, loading, addEntry, removeEntry, merge, loadDemoData, resetAll, duplicates } = usePortfolio();
+  const { state, loading, addEntry, removeEntry, merge, loadDemoData, resetAll, importState, duplicates } = usePortfolio();
   const { assets, entries } = state;
   const [tab, setTab] = useState('resumen');
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [importError, setImportError] = useState(null);
 
   const rendimiento = useMemo(() => rendimientoTotal(assets, entries), [assets, entries]);
   const ultimo = rendimiento.at(-1);
@@ -64,6 +65,23 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = parseImportedState(reader.result);
+        importState(data);
+        setImportError(null);
+      } catch (err) {
+        setImportError(err.message || 'No se pudo importar el archivo.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   return (
     <div className="app-shell">
       <header className="ledger-header">
@@ -74,9 +92,18 @@ export default function App() {
         <div className="toolbar">
           <button className="btn" onClick={loadDemoData}><RefreshCw size={14} style={{ marginRight: 5 }} />Cargar datos de ejemplo</button>
           <button className="btn" onClick={handleExport}><Download size={14} style={{ marginRight: 5 }} />Exportar JSON</button>
+          <label className="btn" style={{ display: 'inline-flex', alignItems: 'center', margin: 0 }}>
+            <Upload size={14} style={{ marginRight: 5 }} />Importar JSON
+            <input type="file" accept="application/json" onChange={handleImportFile} style={{ display: 'none' }} />
+          </label>
           <button className="btn btn-danger" onClick={resetAll}><Trash2 size={14} style={{ marginRight: 5 }} />Vaciar todo</button>
         </div>
       </header>
+      {importError && (
+        <div className="disclaimer" style={{ borderColor: 'var(--critical)', background: '#fdecea', color: 'var(--critical)' }}>
+          {importError}
+        </div>
+      )}
 
       <nav className="tabs">
         {TABS.map((t) => (
