@@ -1,0 +1,8 @@
+# Backend 100% gratuito / open source.
+# TradingAgents (Apache-2.0) se instala aparte porque no está en PyPI de forma
+# estable en todas las versiones; ver README para instrucciones exactas.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+yfinance==0.2.51
+pydantic==2.10.4
+httpx==0.28.1

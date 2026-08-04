@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+.env
+__pycache__
+*.pyc
+.venv
+*.db
+.DS_Store
+backend/data/*.sqlite
+backend/cache/
+
