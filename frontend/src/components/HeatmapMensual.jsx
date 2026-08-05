@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { totalMensual } from '../lib/aggregations';
-import { fmtMes, fmtPct, fmtEUR } from '../lib/format';
+import { fmtMes } from '../lib/format';
 
 // Heatmap de variación % mensual del total de cartera.
 // Nota de accesibilidad (dataviz skill): usamos el par diverging azul↔rojo con

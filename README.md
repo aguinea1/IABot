@@ -64,6 +64,14 @@ pip install "git+https://github.com/TauricResearch/TradingAgents.git"
 uvicorn app.main:app --reload --port 8000
 ```
 
+Para correr los tests (`backend/tests/`), instala además `requirements-dev.txt`
+(añade `pytest`, no necesario para ejecutar el backend en sí):
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```
+
 El backend expone:
 
 - `GET /api/health` — estado del backend y si TradingAgents está disponible.
@@ -80,51 +88,68 @@ true`) para que el resto de la aplicación se pueda probar igualmente.
 
 Variables de entorno opcionales:
 
-- `IABOT_OLLAMA_MODEL` (por defecto `llama3.2`)
-- `OLLAMA_BASE_URL` (por defecto `http://localhost:11434`)
+- `IABOT_OLLAMA_MODEL` (por defecto `qwen3:latest`)
+- `OLLAMA_BASE_URL` (por defecto `http://localhost:11434`; el backend añade
+  automáticamente el sufijo `/v1` al hablar con TradingAgents, porque su
+  cliente Ollama es compatible con la API de OpenAI y espera esa ruta — ver
+  comentario en `backend/app/tradingagents_wrapper.py` para el detalle)
 - En el frontend, `VITE_API_BASE` (por defecto `http://localhost:8000`)
 
 ---
 
 ## Modelo de IA: qué instalar y qué hardware hace falta
 
-**Nota de entorno importante:** el contenedor donde se ha construido este
-proyecto (sesiones de build automatizadas en la nube) no tiene GPU
-garantizada ni Ollama instalado. Por eso la Fase 5 se ha dejado
-**completa a nivel de código** (backend FastAPI, endpoints, caché, frontend
-con la sección "Consejo del analista IA" totalmente funcional) pero
-**probada solo en modo mock**. Queda pendiente de una prueba end-to-end real
-en una máquina con Ollama, indicado también en `PROGRESS.md`.
+**Nota de entorno importante:** el contenedor donde se han construido las
+sesiones de este proyecto (sesiones de build automatizadas en la nube) no
+tiene GPU garantizada, y su acceso de red está restringido a una lista
+blanca que **no incluye `ollama.com`** (confirmado: el script oficial de
+instalación de Ollama devuelve `403` al descargarlo desde este entorno). Por
+eso la Fase 5 se ha dejado **completa a nivel de código** (backend FastAPI,
+endpoints, caché, frontend con la sección "Consejo del analista IA"
+totalmente funcional) pero **sin poder instalar ni ejecutar Ollama en este
+entorno**. Sí se pudo instalar el paquete `tradingagents` real desde GitHub
+en una sesión de build (ver más abajo) para verificar que el wrapper llama a
+su API correctamente, y se corrigió un bug de integración real gracias a
+eso — pero la llamada final a un modelo Ollama en ejecución queda pendiente
+de una máquina con Ollama instalado y accesible, indicado también en
+`PROGRESS.md`.
 
-Modelo recomendado: **`llama3.2`** (3B) vía Ollama.
+Modelo recomendado: **`qwen3:latest`** (8B) vía Ollama.
 
 ```bash
-ollama pull llama3.2
+ollama pull qwen3:latest
 ```
 
-Por qué este modelo: en la integración de TradingAgents con Ollama, no todos
-los modelos sirven — TradingAgents necesita *tool-calling / function-calling*
+Por qué este modelo: se instaló el paquete `tradingagents` real (v0.3.1)
+desde GitHub y se leyó directamente su catálogo de modelos
+(`tradingagents/llm_clients/model_catalog.py`), que es la fuente de verdad
+sobre qué modelos de Ollama soporta bien el proyecto en cada momento — una
+recomendación fija en este README quedaría desactualizada en cuanto el
+catálogo cambie. Hoy (agosto 2026) el catálogo sugiere tres modelos para el
+proveedor `"ollama"`: `qwen3:latest` (8B), `gpt-oss:latest` (20B) y
+`glm-4.7-flash:latest` (30B); se recomienda `qwen3:latest` por ser el más
+ligero de los tres. TradingAgents necesita *tool-calling / function-calling*
 para que sus agentes (analista fundamental, técnico, de sentimiento, gestor
-de riesgo, etc.) puedan invocar herramientas de datos de mercado. `llama3`
-(la versión original) **no** soporta tool-calling y falla; `llama3.2` sí está
-confirmado como compatible. Alternativas si tienes más RAM disponible y
-quieres más calidad de razonamiento:
-
-- `qwen2.5:7b` — más capaz, requiere más RAM (~8 GB libres recomendados).
-- `mistral-nemo` — alternativa intermedia.
+de riesgo, etc.) puedan invocar herramientas de datos de mercado, así que no
+vale cualquier modelo de Ollama — usa siempre uno de los tres del catálogo
+oficial, o comprueba el catálogo actualizado si ha pasado tiempo desde esta
+sesión (`python -c "from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS; print(MODEL_OPTIONS['ollama'])"`
+con el paquete instalado).
 
 Requisitos de hardware orientativos (CPU, sin GPU):
 
 | Modelo | RAM libre recomendada | Velocidad esperada en CPU |
 |---|---|---|
-| `llama3.2` (3B) | ~4-6 GB | Aceptable, segundos por respuesta corta |
-| `qwen2.5:7b` | ~8-10 GB | Más lento, decenas de segundos por consulta compleja |
+| `qwen3:latest` (8B) | ~8-10 GB | Lento pero usable, hasta decenas de segundos por respuesta corta |
+| `gpt-oss:latest` (20B) | ~16-20 GB | Considerablemente más lento, minutos por consulta compleja |
+| `glm-4.7-flash:latest` (30B) | ~24-32 GB | Solo recomendable con GPU o mucha RAM/paciencia |
 
-Con GPU (incluso una de gama media con 8 GB de VRAM) cualquiera de estos
-modelos corre notablemente más rápido. TradingAgents ejecuta varios agentes
-en cadena por consulta (`propagate`), así que una consulta completa puede
-tardar de segundos a un par de minutos dependiendo del hardware y del
-modelo — por eso el backend cachea la respuesta por ticker+día.
+Con GPU (8 GB de VRAM o más) cualquiera de estos modelos corre notablemente
+más rápido. TradingAgents ejecuta varios agentes en cadena por consulta
+(`propagate`), así que una consulta completa puede tardar de segundos a
+varios minutos dependiendo del hardware y del modelo — por eso el backend
+cachea la respuesta por ticker+día (y, desde esta sesión, también por
+categoría — ver "Bugs encontrados" más abajo).
 
 ---
 
@@ -280,13 +305,73 @@ extra de robustez:
   — revertido a un bundle único, estable aunque algo más pesado (~710 KB sin
   comprimir, ~208 KB gzip).
 
+## Revisión de calidad adicional (segunda sesión de build)
+
+Con el PRD ya completo desde la primera sesión, esta sesión se dedicó
+íntegramente a una auditoría de calidad/bugs del código existente (sin
+añadir features nuevas del PRD) y a intentar validar la Fase 5 contra el
+paquete `tradingagents` real. Hallazgos y correcciones:
+
+- **Bug de caché por categoría** (`backend/app/cache.py`): la clave de la
+  caché SQLite era solo `(ticker, fecha)`, así que consultar el mismo ticker
+  con dos categorías distintas el mismo día devolvía siempre el payload de
+  la primera categoría. Corregido incluyendo `categoria` en la clave
+  primaria; con test de regresión (`backend/tests/test_cache.py`).
+- **Bug de integración real con TradingAgents, confirmado instalando el
+  paquete**: se instaló `tradingagents` (v0.3.1) desde GitHub en esta sesión
+  de build (sí fue posible; lo que no fue posible fue instalar y ejecutar
+  Ollama, bloqueado por la lista blanca de red del entorno — ver sección
+  anterior) y se comprobó contra su código real que (a) su catálogo de
+  modelos recomendados para Ollama ya no incluye `llama3.2` (ver sección de
+  arriba) y (b) su cliente Ollama exige que `backend_url` incluya el sufijo
+  `/v1` (API compatible con OpenAI), algo que el wrapper no hacía y que
+  habría roto la llamada real en cuanto alguien probara la Fase 5 con Ollama
+  instalado. Ambos corregidos en `backend/app/tradingagents_wrapper.py`.
+  Verificado también que, sin Ollama corriendo, `get_advice()` cae al mock
+  de forma controlada (excepción capturada, no un error 500).
+- **Categorías inconsistentes en "Consejo IA"**: el selector de categoría de
+  `AsesorIA.jsx` tenía una lista de categorías hardcodeada que omitía
+  "Cuenta remunerada", distinta de la lista real en `lib/models.js`.
+  Corregido para importar la lista única desde `models.js`.
+- **Fugas de estado tras desmontar**: `pedirConsejo`/`enviarPregunta` en
+  `AsesorIA.jsx` no cancelaban su `fetch` si el usuario cambiaba de pestaña
+  antes de que respondiera. Añadido `AbortController` y guardas de montaje.
+- **Fusión de duplicados incompleta**: el botón "Fusionar en..." de
+  `DuplicadosPanel.jsx` solo fusionaba los dos primeros activos de un grupo,
+  aunque hubiera 3 o más duplicados. Corregido para fusionar el grupo
+  completo en un solo click.
+- **`cagr()` podía devolver `NaN`** con un valor final negativo (caso límite
+  poco realista pero posible con datos manuales). Añadido guard defensivo,
+  con test.
+- Accesibilidad de teclado en las pestañas de navegación (`App.jsx`,
+  `VistaPorTipo.jsx`, ahora `<button role="tab">` en vez de `<div onClick>`)
+  y en el icono de fórmula de `KpiCard.jsx` (ahora focuseable, tooltip
+  también por foco/blur).
+- Limpieza de imports sin usar detectada con `oxlint` (sin efecto funcional).
+- **25 tests en verde en frontend** (antes 24) y **6 en backend** (antes 4,
+  ahora con `tradingagents` real instalado en el entorno de build — los
+  tests siguen pasando también sin él instalado, por diseño).
+- Se evaluó también colorear las series de "Evolución por activo" por hash
+  estable de `asset.id` en vez de por posición en el array (para que una
+  fusión de duplicados no desplazara los colores de activos posteriores),
+  pero se descartó tras comprobar visualmente que con pocos activos (caso
+  normal) un hash produce colisiones de color mucho más frecuentes que el
+  caso raro que se quería arreglar. Se documentó la decisión en
+  `frontend/src/lib/format.js` en vez de dejarlo como TODO implícito.
+
 ## Pendiente / próximos pasos sugeridos
 
 - Probar la Fase 5 end-to-end con Ollama real instalado (`ollama pull
-  llama3.2`) y el paquete `tradingagents` instalado desde git.
+  qwen3:latest`) y el paquete `tradingagents` instalado desde git — el
+  wrapper ya está corregido para el endpoint `/v1` y el modelo recomendado
+  actual, pero la llamada de inferencia real sigue sin probarse porque este
+  entorno de build no puede instalar Ollama (ver nota de entorno arriba).
 - Si se usa en un dispositivo compartido, considerar cifrado o exportación
   periódica del `localStorage` (ya existe el botón "Exportar JSON").
 - Ampliar el detalle por analista del endpoint `/api/advice` parseando el
   estado intermedio de `TradingAgentsGraph.propagate()` en vez de solo la
   decisión final, si se necesita más granularidad en el resumen de cada
   analista.
+- Considerar code-splitting real del bundle de Recharts (~714 KB sin
+  comprimir, ~208 KB gzip) con `React.lazy()` a nivel de componente de
+  gráfica.

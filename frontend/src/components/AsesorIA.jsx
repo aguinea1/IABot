@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Bot, Send, ShieldAlert } from 'lucide-react';
+import { CATEGORIAS } from '../lib/models';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
@@ -22,21 +23,36 @@ export default function AsesorIA({ assets }) {
   const [chat, setChat] = useState([]);
   const [loading, setLoading] = useState(false);
   const [usandoMock, setUsandoMock] = useState(false);
+  const montado = useRef(true);
+  const abortRef = useRef(null);
+
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+      abortRef.current?.abort();
+    };
+  }, []);
 
   async function pedirConsejo() {
     if (!ticker.trim()) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     setUsandoMock(false);
     try {
-      const res = await fetch(`${API_BASE}/api/advice?ticker=${encodeURIComponent(ticker)}&category=${encodeURIComponent(categoria)}`);
+      const res = await fetch(`${API_BASE}/api/advice?ticker=${encodeURIComponent(ticker)}&category=${encodeURIComponent(categoria)}`, { signal: controller.signal });
       if (!res.ok) throw new Error('backend no disponible');
       const data = await res.json();
+      if (!montado.current) return;
       setRespuesta(data);
     } catch (e) {
+      if (e.name === 'AbortError' || !montado.current) return;
       setUsandoMock(true);
       setRespuesta({ ...MOCK_ADVICE, ticker });
     } finally {
-      setLoading(false);
+      if (montado.current) setLoading(false);
     }
   }
 
@@ -45,16 +61,20 @@ export default function AsesorIA({ assets }) {
     const preguntaActual = pregunta;
     setChat((c) => [...c, { rol: 'user', texto: preguntaActual }]);
     setPregunta('');
+    const controller = new AbortController();
     try {
       const res = await fetch(`${API_BASE}/api/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticker, pregunta: preguntaActual }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error('backend no disponible');
       const data = await res.json();
+      if (!montado.current) return;
       setChat((c) => [...c, { rol: 'ia', texto: data.respuesta }]);
     } catch (e) {
+      if (e.name === 'AbortError' || !montado.current) return;
       setChat((c) => [...c, { rol: 'ia', texto: '(mock) No hay backend disponible en este entorno. Con Ollama + el backend FastAPI corriendo, aquí verías la respuesta real de TradingAgents sobre tu pregunta.' }]);
     }
   }
@@ -73,16 +93,16 @@ export default function AsesorIA({ assets }) {
 
       <div className="form-grid" style={{ marginBottom: 12 }}>
         <div>
-          <label>Ticker o nombre del activo</label>
-          <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="ej. AAPL, BTC-USD, VWCE.DE" list="activos-propios" />
+          <label htmlFor="asesor-ia-ticker">Ticker o nombre del activo</label>
+          <input id="asesor-ia-ticker" value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="ej. AAPL, BTC-USD, VWCE.DE" list="activos-propios" />
           <datalist id="activos-propios">
             {assets.map((a) => <option key={a.id} value={a.nombre} />)}
           </datalist>
         </div>
         <div>
-          <label>Categoría</label>
-          <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-            {['Acciones/ETFs', 'Fondos indexados', 'Cripto', 'Materias primas/Oro', 'Otros'].map((c) => <option key={c}>{c}</option>)}
+          <label htmlFor="asesor-ia-categoria">Categoría</label>
+          <select id="asesor-ia-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
         <button className="btn btn-primary" onClick={pedirConsejo} disabled={loading}>{loading ? 'Consultando…' : 'Pedir consejo'}</button>
@@ -112,9 +132,9 @@ export default function AsesorIA({ assets }) {
       )}
 
       <div>
-        <label>Pregunta libre sobre {ticker || 'el activo'}</label>
+        <label htmlFor="asesor-ia-pregunta">Pregunta libre sobre {ticker || 'el activo'}</label>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input style={{ flex: 1 }} value={pregunta} onChange={(e) => setPregunta(e.target.value)} placeholder="ej. ¿Qué riesgos tiene a corto plazo?" onKeyDown={(e) => e.key === 'Enter' && enviarPregunta()} />
+          <input id="asesor-ia-pregunta" style={{ flex: 1 }} value={pregunta} onChange={(e) => setPregunta(e.target.value)} placeholder="ej. ¿Qué riesgos tiene a corto plazo?" onKeyDown={(e) => e.key === 'Enter' && enviarPregunta()} />
           <button className="btn" onClick={enviarPregunta}><Send size={14} /></button>
         </div>
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>

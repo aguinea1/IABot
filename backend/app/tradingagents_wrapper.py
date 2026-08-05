@@ -2,12 +2,23 @@
 github.com/TauricResearch/TradingAgents), configurado siempre con
 llm_provider="ollama" — nunca con una API de pago.
 
-Modelo recomendado (agosto 2026): "llama3.2" (3B) vía Ollama. Es uno de los
-pocos modelos confirmados con soporte de tool-calling/function-calling en la
-integración de TradingAgents con Ollama (los ejemplos con "llama3" simple
-fallan porque ese modelo no soporta function-calling). Alternativas si hay
-más RAM disponible: "qwen2.5:7b" o "mistral-nemo". Ver README para requisitos
-de hardware exactos.
+Modelo recomendado: confirmado instalando el paquete real `tradingagents`
+(v0.3.1, agosto 2026) y leyendo su catálogo de modelos
+(`tradingagents/llm_clients/model_catalog.py`, clave "ollama"): los modelos
+que el propio proyecto sugiere hoy para Ollama son "qwen3:latest" (8B),
+"gpt-oss:latest" (20B) y "glm-4.7-flash:latest" (30B) — la recomendación de
+"llama3.2" de una versión anterior de este README ya no aparece en el
+catálogo del paquete instalado y se ha corregido. Se usa "qwen3:latest" (8B)
+como valor por defecto porque es el más ligero de los tres. Ver README para
+requisitos de hardware exactos y alternativas.
+
+Detalle importante de integración descubierto al instalar el paquete real:
+el cliente Ollama de TradingAgents es compatible con la API de OpenAI y
+espera el `base_url` con el sufijo "/v1" (p.ej. "http://localhost:11434/v1"),
+no la raíz "http://localhost:11434" que expone Ollama de forma nativa. Por
+eso aquí se añade "/v1" al construir `config["backend_url"]` para el grafo,
+mientras que `ask_free_question()` sí usa la raíz sin "/v1" porque llama
+directamente al endpoint nativo /api/generate de Ollama, que es distinto.
 
 Esta capa NUNCA cae a una API de pago como fallback. Si TradingAgents u
 Ollama no están disponibles en el entorno, se devuelve una respuesta de
@@ -18,8 +29,12 @@ from __future__ import annotations
 import os
 from datetime import date
 
-OLLAMA_MODEL = os.environ.get("IABOT_OLLAMA_MODEL", "llama3.2")
+OLLAMA_MODEL = os.environ.get("IABOT_OLLAMA_MODEL", "qwen3:latest")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+# Endpoint OpenAI-compatible que espera el cliente "ollama" de TradingAgents
+# (ver nota arriba) — distinto de OLLAMA_BASE_URL "a pelo", que se usa para
+# el endpoint nativo de Ollama en ask_free_question().
+OLLAMA_OPENAI_COMPAT_URL = OLLAMA_BASE_URL.rstrip("/") + "/v1"
 
 _tradingagents_available = False
 try:
@@ -39,6 +54,7 @@ def tradingagents_status() -> dict:
         "tradingagents_instalado": _tradingagents_available,
         "modelo_ollama": OLLAMA_MODEL,
         "ollama_base_url": OLLAMA_BASE_URL,
+        "ollama_openai_compat_url": OLLAMA_OPENAI_COMPAT_URL,
         "modo": "real" if _tradingagents_available else "mock",
     }
 
@@ -72,7 +88,7 @@ def get_advice(ticker: str, categoria: str | None = None) -> dict:
     try:
         config = DEFAULT_CONFIG.copy()
         config["llm_provider"] = "ollama"
-        config["backend_url"] = OLLAMA_BASE_URL
+        config["backend_url"] = OLLAMA_OPENAI_COMPAT_URL
         config["deep_think_llm"] = OLLAMA_MODEL
         config["quick_think_llm"] = OLLAMA_MODEL
 

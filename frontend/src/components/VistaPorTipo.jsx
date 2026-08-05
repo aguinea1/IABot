@@ -24,11 +24,18 @@ export default function VistaPorTipo({ assets, entries, onAssetClick }) {
 
   return (
     <div>
-      <div className="tabs" style={{ marginBottom: 12 }}>
+      <div className="tabs" role="tablist" style={{ marginBottom: 12 }}>
         {Object.entries(GRUPOS).map(([key, g]) => (
-          <div key={key} className={`tab ${grupo === key ? 'active' : ''}`} onClick={() => setGrupo(key)}>
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={grupo === key}
+            className={`tab ${grupo === key ? 'active' : ''}`}
+            onClick={() => setGrupo(key)}
+          >
             {g.label}
-          </div>
+          </button>
         ))}
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>

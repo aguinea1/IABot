@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildTestData } from '../../data/testData';
 import { cagr, volatilidadMensual, maxDrawdown, hhi, proyeccion } from '../metrics';
+import { createAsset, createEntry } from '../models';
 
 describe('Métricas Fase 2 sobre dataset de prueba', () => {
   const { assets, entries } = buildTestData();
@@ -33,5 +34,16 @@ describe('Métricas Fase 2 sobre dataset de prueba', () => {
     for (const punto of p) {
       expect(punto.pesimista).toBeLessThanOrEqual(punto.optimista);
     }
+  });
+
+  it('cagr no devuelve NaN cuando el valor final es negativo (edge case defensivo)', () => {
+    const asset = createAsset({ nombre: 'Activo raro', categoria: 'Otros' });
+    const entradas = [
+      createEntry({ assetId: asset.id, mes: '2025-01', modo: 'valor', valor: 100 }),
+      createEntry({ assetId: asset.id, mes: '2025-02', modo: 'valor', valor: -50 }),
+    ];
+    const resultado = cagr([asset], entradas);
+    expect(Number.isNaN(resultado)).toBe(false);
+    expect(Number.isFinite(resultado)).toBe(true);
   });
 });

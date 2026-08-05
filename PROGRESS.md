@@ -116,3 +116,155 @@ revertido a bundle único, que es estable.
   Ollama queda pendiente de una máquina apropiada, tal y como pedía el
   encargo.
 - No se ha tocado ningún servicio de pago en ningún punto del proyecto.
+
+---
+
+## Sesión del 2026-08-05 (segunda sesión — el PRD ya estaba completo)
+
+### Estado de partida
+
+Al arrancar esta sesión, este mismo fichero (versión de la sesión del
+2026-08-04) indicaba que **todas las fases del PRD (0 a 6) estaban
+completas**, con build, tests (24/24 frontend, 4/4 backend) y arranque
+funcionando correctamente, más una pasada extra de pulido ya hecha en la
+misma primera sesión (importar JSON, accesibilidad de teclado, tests de
+integración). Siguiendo la instrucción de "si el proyecto ya está completo,
+haz una revisión de calidad/bugs adicional en vez de repetir trabajo", esta
+sesión se ha dedicado íntegramente a eso: no se ha tocado ninguna fase del
+PRD ni se han añadido features nuevas del encargo.
+
+### Qué se hizo hoy
+
+1. **Verificación de partida**: se confirmó que build, los 24 tests de
+   frontend y los 4 de backend seguían en verde antes de tocar nada.
+2. **Auditoría de calidad con un agente de exploración** sobre
+   `lib/aggregations.js`, `lib/metrics.js`, `lib/normalize.js`,
+   `lib/models.js`, `lib/storage.js`, todos los componentes de
+   `frontend/src/components`, y todo `backend/app/`. Se devolvieron 10
+   hallazgos reales (2 importantes, 8 menores), sin ningún hallazgo crítico.
+3. **Correcciones aplicadas** (detalladas también en README.md, sección
+   "Revisión de calidad adicional"):
+   - Bug de caché por categoría en `backend/app/cache.py` (la clave de
+     caché SQLite no distinguía `categoria`; corregido + test de regresión
+     en `backend/tests/test_cache.py`).
+   - Categorías incompletas en el selector de "Consejo IA"
+     (`AsesorIA.jsx` tenía una lista hardcodeada que omitía "Cuenta
+     remunerada"; ahora importa `CATEGORIAS` de `lib/models.js`).
+   - Fugas de estado tras desmontar en `AsesorIA.jsx` (`fetch` sin
+     `AbortController`; corregido).
+   - Fusión de duplicados incompleta en `DuplicadosPanel.jsx` (solo
+     fusionaba los dos primeros de un grupo de 3+; corregido para fusionar
+     el grupo entero de un click).
+   - `cagr()` podía devolver `NaN` con valor final negativo (guard añadido
+     + test).
+   - Accesibilidad de teclado real en las pestañas de navegación
+     (`App.jsx`, `VistaPorTipo.jsx`: ahora `<button role="tab">`) y en el
+     icono de fórmula de `KpiCard.jsx` (ahora focuseable).
+   - Labels sin asociar (`htmlFor`/`id`) en los campos de `AsesorIA.jsx`.
+   - Limpieza de imports sin usar (`oxlint` en verde salvo un warning
+     cosmético preexistente en `normalize.js`, no funcional).
+   - Se evaluó y **descartó explícitamente** colorear las series de
+     "Evolución por activo" por hash de `asset.id` en vez de por posición
+     en el array (para estabilidad tras una fusión); se revirtió tras
+     comprobar visualmente que con pocos activos un hash produce
+     colisiones de color mucho más frecuentes que el problema que
+     intentaba resolver. Decisión documentada en `lib/format.js` y README
+     para que no se reintente sin motivo.
+4. **Se instaló el paquete real `tradingagents`** (v0.3.1, desde GitHub) en
+   el entorno de build para validar la Fase 5 contra código real en vez de
+   solo contra supuestos. Esto permitió confirmar y corregir **dos bugs
+   reales de integración** en `backend/app/tradingagents_wrapper.py`:
+   - El catálogo de modelos recomendados de TradingAgents para Ollama ya no
+     incluye `llama3.2` (que se había documentado en la sesión anterior);
+     hoy recomienda `qwen3:latest` (8B), `gpt-oss:latest` (20B) y
+     `glm-4.7-flash:latest` (30B). Se cambió el modelo por defecto a
+     `qwen3:latest` y se actualizó el README con esta fuente verificada
+     (`tradingagents/llm_clients/model_catalog.py`).
+   - El cliente Ollama de TradingAgents es compatible con la API de OpenAI
+     y **requiere que `backend_url` incluya el sufijo `/v1`**
+     (`http://localhost:11434/v1`), algo que el wrapper no hacía (usaba la
+     raíz `http://localhost:11434`) y que habría roto la llamada real en
+     cuanto alguien probara la Fase 5 con Ollama instalado. Corregido.
+   - Se confirmó que, sin Ollama corriendo, `get_advice()` captura la
+     excepción de conexión y cae al mock de forma controlada (no un error
+     500) — comportamiento correcto verificado con el paquete real
+     instalado, no solo asumido.
+   - **Se intentó instalar Ollama en este entorno de build y no fue
+     posible**: `curl https://ollama.com/install.sh` devuelve `403` porque
+     el acceso de red de este contenedor está restringido a una lista
+     blanca que no incluye `ollama.com`. Esto confirma (no solo repite) la
+     limitación de entorno ya documentada en la sesión anterior. La llamada
+     de inferencia real contra un modelo Ollama en ejecución sigue sin
+     poder probarse desde una sesión de build; el wrapper y el README están
+     ahora correctos y listos para esa prueba en cuanto alguien lo ejecute
+     en una máquina con Ollama.
+5. **Tests nuevos**: `backend/tests/test_cache.py` (2 tests, caché por
+   categoría), `frontend/src/lib/__tests__/metrics.test.js` (+1 test, guard
+   de `cagr`), `frontend/src/__tests__/components.test.jsx` (2 tests nuevos:
+   categorías completas en `AsesorIA`, fusión de grupo completo en
+   `DuplicadosPanel`). Total: **28 tests en verde en frontend** (antes 24),
+   **6 en backend** (antes 4).
+6. **`backend/requirements-dev.txt` añadido** (solo `pytest`, no necesario
+   para ejecutar el backend en producción local) — antes `pytest` no estaba
+   declarado en ningún fichero de dependencias, aunque los tests ya
+   existían y pasaban si se instalaba manualmente.
+7. **`frontend/package-lock.json` regenerado**: tenía entradas de lockfile
+   incompletas para dependencias de test (`jsdom`, `@testing-library/*`) ya
+   declaradas en `package.json` pero no bloqueadas — `npm ci` habría podido
+   fallar o resolver versiones distintas en una máquina limpia. Corregido
+   con `npm install`.
+8. **Verificación final end-to-end** (Playwright headless contra
+   `vite preview`, no solo `npm run build`): capturas en escritorio
+   (1280×900) con datos de ejemplo cargados (colores de las 6 series todos
+   distintos, panel "Consejo IA" con disclaimer visible) y en móvil
+   (390×844) confirmando el layout responsive. Sin errores de consola
+   aparte de un intento de red esperado (el backend no estaba corriendo
+   durante la prueba, así que "Consejo IA" cae a mock correctamente).
+
+### En qué se quedó / próxima sesión
+
+**Todo compila, testea y arranca correctamente.** No hay ningún cambio a
+medias. Resumen de comandos de verificación (todos en verde a fecha de
+hoy):
+
+```bash
+cd frontend && npm run test -- --run   # 28/28
+cd frontend && npm run build           # sin errores
+cd backend && pip install -r requirements-dev.txt && python -m pytest tests/ -q  # 6/6
+```
+
+Próximos pasos concretos si se retoma:
+
+1. Si en algún momento se dispone de una máquina con Ollama instalado
+   (fuera de este entorno de build, que tiene el acceso a `ollama.com`
+   bloqueado): `ollama pull qwen3:latest`,
+   `pip install "git+https://github.com/TauricResearch/TradingAgents.git"`
+   y probar `/api/advice` y `/api/ask` en modo real. El wrapper ya está
+   corregido (modelo + endpoint `/v1`); si la estructura de retorno de
+   `propagate()` no encaja exactamente con lo asumido en
+   `tradingagents_wrapper.py`, ajustar el parseo ahí.
+2. Revisar de vez en cuando el catálogo de modelos de `tradingagents`
+   (`tradingagents/llm_clients/model_catalog.py`, clave `"ollama"`) porque
+   cambia con las versiones del paquete — la recomendación de este README
+   es la vigente a fecha de instalación (agosto 2026, v0.3.1), no una
+   garantía permanente.
+3. Considerar code-splitting real del bundle de Recharts (~714 KB sin
+   comprimir) con `React.lazy()` a nivel de componente de gráfica.
+4. Si el proyecto pasa a usarse de verdad, considerar cifrado o backup
+   automático del `localStorage` más allá del botón manual "Exportar JSON".
+5. Si se repite esta sesión sin más hallazgos de calidad nuevos, se puede
+   considerar el proyecto en régimen de mantenimiento normal: revisiones
+   puntuales en vez de auditorías completas cada vez.
+
+### Decisiones de diseño de hoy (además de las de la sesión anterior)
+
+- Colores de serie por posición en el array de activos, no por hash de
+  identidad — decisión revertida tras comprobar que era peor en el caso
+  común (ver punto 3 de arriba y comentario en `lib/format.js`).
+- Modelo de Ollama recomendado cambiado de `llama3.2` a `qwen3:latest`
+  siguiendo el catálogo oficial del paquete real instalado, no una
+  suposición — ver README para la fuente exacta.
+- Ningún hallazgo de la auditoría de hoy comprometía la restricción de
+  "100% gratuito": el bug de `backend_url` sin `/v1` habría hecho fallar la
+  llamada real a Ollama (local, gratis) — nunca habría hecho que el código
+  cayera a una API de pago, porque esa vía no existe en este proyecto.

@@ -1,0 +1,3 @@
+# Dependencias solo para desarrollo/testing (no necesarias para correr el backend).
+-r requirements.txt
+pytest==8.3.4

@@ -9,7 +9,12 @@ export default function DuplicadosPanel({ duplicates, onMerge }) {
       {duplicates.map((group, i) => (
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
           {group.map((a) => <span key={a.id} className="badge badge-warn">{a.nombre}</span>)}
-          <button className="btn" onClick={() => onMerge(group[0].id, group[1].id)}>Fusionar en "{group[0].nombre}"</button>
+          <button
+            className="btn"
+            onClick={() => group.slice(1).forEach((a) => onMerge(group[0].id, a.id))}
+          >
+            Fusionar en "{group[0].nombre}"
+          </button>
         </div>
       ))}
     </div>

@@ -16,7 +16,7 @@ import PanelDetalleActivo from './components/PanelDetalleActivo';
 import DuplicadosPanel from './components/DuplicadosPanel';
 import AsesorIA from './components/AsesorIA';
 
-import { rendimientoTotal, totalMensual } from './lib/aggregations';
+import { rendimientoTotal } from './lib/aggregations';
 import { cagr, volatilidadMensual, maxDrawdown, hhi, FORMULAS } from './lib/metrics';
 import { exportStateAsJSON, parseImportedState } from './lib/storage';
 import { fmtEUR, fmtPct } from './lib/format';
@@ -105,9 +105,18 @@ export default function App() {
         </div>
       )}
 
-      <nav className="tabs">
+      <nav className="tabs" role="tablist">
         {TABS.map((t) => (
-          <div key={t.key} className={`tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</div>
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`tab ${tab === t.key ? 'active' : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
         ))}
       </nav>
 

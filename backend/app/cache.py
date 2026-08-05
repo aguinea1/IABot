@@ -19,9 +19,9 @@ def _ensure_db():
             CREATE TABLE IF NOT EXISTS advice_cache (
                 ticker TEXT NOT NULL,
                 fecha TEXT NOT NULL,
-                categoria TEXT,
+                categoria TEXT NOT NULL DEFAULT '',
                 payload TEXT NOT NULL,
-                PRIMARY KEY (ticker, fecha)
+                PRIMARY KEY (ticker, fecha, categoria)
             )
             """
         )
@@ -39,10 +39,11 @@ def _conn():
 
 def get_cached_advice(ticker: str, categoria: str | None = None):
     hoy = date.today().isoformat()
+    categoria = categoria or ""
     with _conn() as con:
         row = con.execute(
-            "SELECT payload FROM advice_cache WHERE ticker = ? AND fecha = ?",
-            (ticker.upper(), hoy),
+            "SELECT payload FROM advice_cache WHERE ticker = ? AND fecha = ? AND categoria = ?",
+            (ticker.upper(), hoy, categoria),
         ).fetchone()
         if row:
             return json.loads(row[0])
@@ -51,6 +52,7 @@ def get_cached_advice(ticker: str, categoria: str | None = None):
 
 def set_cached_advice(ticker: str, categoria: str, payload: dict):
     hoy = date.today().isoformat()
+    categoria = categoria or ""
     with _conn() as con:
         con.execute(
             "INSERT OR REPLACE INTO advice_cache (ticker, fecha, categoria, payload) VALUES (?, ?, ?, ?)",

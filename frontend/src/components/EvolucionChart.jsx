@@ -45,7 +45,7 @@ function ClickableDot(props) {
       style={{ cursor: 'pointer' }}
       onClick={(e) => {
         e.stopPropagation();
-        onAssetClick && onAssetClick(dataKey);
+        if (onAssetClick) onAssetClick(dataKey);
       }}
     />
   );

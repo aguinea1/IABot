@@ -41,3 +41,13 @@ export function colorForCategoria(categoria) {
   const idx = CATEGORIA_COLOR_IDX[categoria] ?? 7;
   return colorForIndex(idx);
 }
+
+// Nota de diseño: las series de EvolucionChart se colorean por posición en
+// el array `assets` (vía colorForIndex), no por un hash del id. Se evaluó
+// colorear por identidad estable (hash de asset.id) para que una fusión de
+// duplicados no cambie el color de los activos posteriores, pero con pocos
+// activos (caso normal, <8) un hash produce colisiones de color visibles con
+// mucha más frecuencia que el caso raro que se intentaba arreglar (una
+// fusión de duplicados). Se mantiene por índice: garantiza colores distintos
+// para los primeros 8 activos y solo se desplaza tras una fusión/borrado,
+// evento poco frecuente.

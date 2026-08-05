@@ -16,7 +16,7 @@ export function cagr(assets, entries) {
   if (mensual.length < 2) return 0;
   const inicio = mensual[0].total;
   const fin = mensual.at(-1).total;
-  if (inicio <= 0) return 0;
+  if (inicio <= 0 || fin < 0) return 0;
   const meses = mensual.length - 1;
   if (meses <= 0) return 0;
   return (Math.pow(fin / inicio, 12 / meses) - 1) * 100;
