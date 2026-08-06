@@ -70,9 +70,16 @@ vez)". Se siguió esa recomendación al pie de la letra.
    instaló temporalmente solo para esta verificación (`npm install --no-save
    playwright`); no queda como dependencia del proyecto ni el script queda
    en el repo.
-8. **Verificación final**: `npm run test -- --run` (42/42), `npm run build`
-   sin errores, `npm run lint` (solo el warning cosmético preexistente de
-   `normalize.js`), `pytest` en backend (8/8).
+8. **Se aprovechó para limpiar el único warning cosmético preexistente**
+   (`normalize.js:41`, `unicorn/no-new-array`, arrastrado desde hace tres
+   sesiones): `new Array(n + 1).fill(0)` reemplazado por
+   `Array.from({ length: n + 1 }, () => 0)`, sin cambio de comportamiento.
+   `npm run lint` queda ahora sin ningún warning.
+9. **`.gitignore`**: se añadió `venv` (además de `.venv`, ya presente) —
+   esta sesión creó el virtualenv de backend como `backend/venv/` y no
+   estaba cubierto.
+10. **Verificación final**: `npm run test -- --run` (42/42), `npm run build`
+    sin errores, `npm run lint` (0 warnings), `pytest` en backend (8/8).
 
 ### En qué se quedó / próxima sesión
 
@@ -81,7 +88,7 @@ vez)". Se siguió esa recomendación al pie de la letra.
 ```bash
 cd frontend && npm install && npm run test -- --run   # 42/42
 cd frontend && npm run build                           # sin errores
-cd frontend && npm run lint                            # solo 1 warning cosmético preexistente
+cd frontend && npm run lint                            # 0 warnings (limpiado hoy)
 cd backend && pip install -r requirements.txt -r requirements-dev.txt && python -m pytest tests/ -q  # 8/8
 ```
 

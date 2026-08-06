@@ -542,10 +542,16 @@ una relectura manual de `main.py`/`cache.py`. Hallazgos reales:
   script de la prueba fue una herramienta ad-hoc de esta sesión, no se
   incorpora al repo como dependencia permanente (Playwright no está en
   `devDependencies`; se instaló temporalmente solo para esta verificación).
+- **Limpieza del único warning cosmético preexistente** de `npm run lint`
+  (`normalize.js:41`, `unicorn/no-new-array`, arrastrado desde hace tres
+  sesiones sin afectar al funcionamiento): `new Array(n + 1).fill(0)` →
+  `Array.from({ length: n + 1 }, () => 0)`. `npm run lint` queda ahora en
+  0 warnings. De paso se añadió `venv` a `.gitignore` (esta sesión usó
+  `backend/venv/`, no cubierto hasta ahora, solo `.venv`).
 - Verificación final: **42 tests en verde en frontend** (antes 33: +4 de
   regresión de bugs + 5 de cobertura nueva) y **8 en backend** (sin
-  cambios, no se tocó nada de backend). `npm run build` y `npm run lint`
-  en verde (mismo único warning cosmético preexistente de `normalize.js`).
+  cambios, no se tocó nada de backend). `npm run build` sin errores y
+  `npm run lint` en 0 warnings.
 
 ## Pendiente / próximos pasos sugeridos
 
