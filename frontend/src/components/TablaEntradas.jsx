@@ -6,7 +6,7 @@ export default function TablaEntradas({ assets, entries, onRemove, onRowClick })
   const [filtro, setFiltro] = useState('');
   const assetById = new Map(assets.map((a) => [a.id, a]));
   const rows = [...entries]
-    .sort((a, b) => (a.mes < b.mes ? 1 : -1))
+    .sort((a, b) => (a.mes < b.mes ? 1 : a.mes > b.mes ? -1 : 0))
     .filter((e) => {
       const a = assetById.get(e.assetId);
       return !filtro || (a && a.nombre.toLowerCase().includes(filtro.toLowerCase()));

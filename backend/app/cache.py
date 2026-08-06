@@ -10,10 +10,19 @@ from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "cache", "advice_cache.sqlite")
 
-
+# `sqlite3.Connection` como gestor de contexto ("with con:") solo controla la
+# transacción (commit/rollback), NO cierra la conexión — hay que cerrarla a
+# mano. Bug encontrado en la revisión de calidad del 2026-08-06: cada llamada
+# a `get_cached_advice`/`set_cached_advice` invocaba `_ensure_db()`, que abría
+# una conexión SQLite adicional y nunca la cerraba explícitamente (fuga de
+# descriptor de archivo bajo tráfico sostenido). Se corrige cerrándola
+# siempre. No se cachea "ya inicializado" en una variable de módulo a propósito:
+# `DB_PATH` puede cambiar en tests (via monkeypatch) para aislar cada test en
+# su propio fichero temporal, y `CREATE TABLE IF NOT EXISTS` es barato.
 def _ensure_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    with sqlite3.connect(DB_PATH) as con:
+    con = sqlite3.connect(DB_PATH)
+    try:
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS advice_cache (
@@ -25,6 +34,9 @@ def _ensure_db():
             )
             """
         )
+        con.commit()
+    finally:
+        con.close()
 
 
 @contextmanager

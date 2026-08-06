@@ -5,22 +5,34 @@ import { fmtEUR, fmtPct, fmtMes } from '../lib/format';
 
 export default function PanelDetalleActivo({ assetId, assets, entries, onClose }) {
   const closeBtnRef = useRef(null);
+  // Guardamos `onClose` en un ref para que el listener de teclado siempre
+  // llame a la versión más reciente sin tener que incluirlo en las deps del
+  // efecto de abajo. Bug encontrado en la revisión de calidad del
+  // 2026-08-06: `onClose` se pasa como arrow function inline desde App.jsx,
+  // así que cambia de identidad en cada render de App; si estaba en las
+  // deps, cualquier re-render de App mientras el panel estaba abierto
+  // (cambiar de pestaña, añadir una entrada, etc.) volvía a disparar el
+  // efecto y robaba el foco de vuelta al botón de cerrar, aunque el usuario
+  // estuviera escribiendo en otro campo.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!assetId) return;
     closeBtnRef.current?.focus();
     function onKeyDown(e) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [assetId, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId]);
 
   if (!assetId) return null;
   const asset = assets.find((a) => a.id === assetId);
   if (!asset) return null;
   const detalle = porActivo(assets, entries).find((p) => p.asset.id === assetId);
-  const movimientos = entries.filter((e) => e.assetId === assetId).sort((a, b) => (a.mes < b.mes ? -1 : 1));
+  const movimientos = entries.filter((e) => e.assetId === assetId).sort((a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0));
 
   return (
     <>

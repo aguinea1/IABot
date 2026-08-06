@@ -30,11 +30,18 @@ import os
 from datetime import date
 
 OLLAMA_MODEL = os.environ.get("IABOT_OLLAMA_MODEL", "qwen3:latest")
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+# Normalizado una sola vez aquí (sin barra final): bug encontrado en la
+# revisión de calidad del 2026-08-06: si alguien exporta OLLAMA_BASE_URL con
+# barra final (p.ej. "http://localhost:11434/"), OLLAMA_OPENAI_COMPAT_URL
+# quedaba bien formada por su propio .rstrip(), pero ask_free_question()
+# construía la URL nativa con doble barra ("http://localhost:11434//api/generate"),
+# lo que puede fallar según cómo Ollama normalice la ruta. Se corrige
+# aplicando rstrip aquí, una sola vez, en vez de en cada uso.
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 # Endpoint OpenAI-compatible que espera el cliente "ollama" de TradingAgents
 # (ver nota arriba) — distinto de OLLAMA_BASE_URL "a pelo", que se usa para
 # el endpoint nativo de Ollama en ask_free_question().
-OLLAMA_OPENAI_COMPAT_URL = OLLAMA_BASE_URL.rstrip("/") + "/v1"
+OLLAMA_OPENAI_COMPAT_URL = OLLAMA_BASE_URL + "/v1"
 
 _tradingagents_available = False
 try:

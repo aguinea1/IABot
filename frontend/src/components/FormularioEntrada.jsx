@@ -6,7 +6,16 @@ import { Plus } from 'lucide-react';
 export default function FormularioEntrada({ assets, onAdd }) {
   const [nombre, setNombre] = useState('');
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
-  const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
+  const [mes, setMes] = useState(() => {
+    // `toISOString()` da el año-mes en UTC, no en la hora local del
+    // usuario. Bug encontrado en la revisión de calidad del 2026-08-06:
+    // cerca de medianoche local, un usuario en un huso horario negativo
+    // (América) podía ver precargado el mes SIGUIENTE al real, y uno en
+    // huso positivo cerca de fin de mes el mes ANTERIOR. Se construye el
+    // string YYYY-MM a partir de los componentes locales de Date.
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [modo, setModo] = useState('valor');
   const [valor, setValor] = useState('');
   const [participaciones, setParticipaciones] = useState('');

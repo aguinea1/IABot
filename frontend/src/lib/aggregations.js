@@ -75,12 +75,18 @@ export function desgloseCategoria(assets, entries) {
   for (const asset of assets) {
     const es = entries.filter((e) => e.assetId === asset.id && e.mes <= lastMonth);
     if (es.length === 0) continue;
-    const last = es.sort((a, b) => (a.mes < b.mes ? -1 : 1)).at(-1);
+    const last = es.sort((a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0)).at(-1);
     porAsset.set(asset.id, last.valor);
   }
   const porCategoria = new Map();
   for (const asset of assets) {
-    const v = porAsset.get(asset.id) || 0;
+    // Solo activos con al menos una entrada hasta este mes contribuyen al
+    // desglose: un activo sin entradas (huérfano tras borrar todas sus
+    // entradas, o recién creado sin datos) no debe generar una categoría
+    // "fantasma" con valor 0€ (bug encontrado en la revisión de calidad del
+    // 2026-08-06).
+    if (!porAsset.has(asset.id)) continue;
+    const v = porAsset.get(asset.id);
     porCategoria.set(asset.categoria, (porCategoria.get(asset.categoria) || 0) + v);
   }
   return [...porCategoria.entries()].map(([categoria, valor]) => ({ categoria, valor }));
@@ -90,7 +96,7 @@ export function desgloseCategoria(assets, entries) {
 // valor actual - aportado acumulado de ese activo).
 export function porActivo(assets, entries) {
   return assets.map((asset) => {
-    const es = entries.filter((e) => e.assetId === asset.id).sort((a, b) => (a.mes < b.mes ? -1 : 1));
+    const es = entries.filter((e) => e.assetId === asset.id).sort((a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0));
     if (es.length === 0) return { asset, aportado: 0, valorActual: 0, rendimiento: 0, rentabilidadPct: 0 };
     const aportado = es.reduce((s, e) => s + (e.aportacion || 0), 0);
     const valorActual = es.at(-1).valor;

@@ -359,13 +359,127 @@ paquete `tradingagents` real. Hallazgos y correcciones:
   caso raro que se quería arreglar. Se documentó la decisión en
   `frontend/src/lib/format.js` en vez de dejarlo como TODO implícito.
 
+## Revisión de calidad adicional (tercera sesión de build, 2026-08-06)
+
+El proyecto ya estaba completo (PRD 0-6) al arrancar esta sesión, así que de
+nuevo se dedicó íntegramente a auditoría de calidad — dos rondas con un
+agente de exploración fresco sobre archivos que aún no habían recibido una
+revisión tan a fondo, seguidas de verificación manual y tests de regresión
+para cada hallazgo real. No se ha tocado ninguna fase del PRD ni la
+restricción "100% gratuito". Hallazgos y correcciones:
+
+- **`npm run lint` no funcionaba en un checkout limpio**: `oxlint` estaba
+  referenciado en el script `lint` de `package.json` pero nunca se había
+  declarado como `devDependency` — cualquiera que clonara el repo y
+  ejecutara `npm install && npm run lint` se encontraba con `oxlint: not
+  found`. Las dos sesiones anteriores habían corrido `oxlint` con el binario
+  ya presente en su propio entorno de build sin darse cuenta de que no
+  estaba en el lockfile. Corregido añadiéndolo a `devDependencies` (queda un
+  único warning cosmético preexistente en `normalize.js`, ya documentado).
+- **Fuga de conexión SQLite en cada petición** (`backend/app/cache.py`):
+  `sqlite3.Connection` como gestor de contexto (`with con:`) solo controla la
+  transacción (commit/rollback), **no cierra la conexión** — `_ensure_db()`
+  abría una conexión nueva en cada llamada a `get_cached_advice`/
+  `set_cached_advice` (es decir, en cada petición a `/api/advice`) y nunca la
+  cerraba explícitamente. Corregido cerrándola siempre con `try/finally`.
+- **Robo de foco (focus-stealing) real en el panel de detalle**
+  (`PanelDetalleActivo.jsx`): el `useEffect` que enfoca el botón de cerrar al
+  abrir el panel dependía de `[assetId, onClose]`, pero `onClose` se pasa
+  desde `App.jsx` como arrow function inline, así que cambia de identidad en
+  cada render de `App`. Cualquier re-render mientras el panel estaba abierto
+  (cambiar de pestaña, añadir una entrada...) volvía a disparar el efecto y
+  robaba el foco de vuelta al botón de cerrar, aunque el usuario estuviera
+  escribiendo en otro campo. Corregido guardando `onClose` en un `ref` y
+  dejando el efecto dependiente solo de `assetId`. Con test de regresión en
+  `frontend/src/__tests__/components.test.jsx`.
+- **Comparador de `sort` inconsistente para entradas del mismo mes** (tres
+  sitios: `lib/aggregations.js` ×2, `PanelDetalleActivo.jsx`,
+  `TablaEntradas.jsx`): el patrón `(a, b) => (a.mes < b.mes ? -1 : 1)` nunca
+  devuelve `0`, violando el contrato de comparador de `Array.prototype.sort`.
+  Si un usuario introduce dos `Entry` para el mismo activo en el mismo mes
+  (no hay UI de edición, solo alta/baja, así que corregir un valor implica
+  añadir una entrada nueva), el orden resultante no estaba garantizado como
+  "la última añadida gana"; el valor actual por activo, el desglose por
+  categoría y el historial del panel de detalle podían mostrar el valor de
+  la entrada equivocada de forma no determinista. Corregido con un
+  comparador de 3 vías en los cuatro sitios. Con test de regresión en
+  `frontend/src/lib/__tests__/aggregations.test.js`.
+- **Categorías "fantasma" con valor 0€** (`desgloseCategoria` en
+  `lib/aggregations.js`): un activo sin ninguna `Entry` (huérfano tras borrar
+  todas sus entradas) aportaba igualmente su categoría al desglose con
+  `valor: 0`. Corregido para omitir del desglose los activos sin ninguna
+  entrada. Con test de regresión.
+- **Colisión crítica de identidad en `canonicalKey`** (`lib/normalize.js`):
+  la limpieza `.replace(/[^a-z0-9]+/g, '')` descartaba cualquier carácter no
+  ASCII, así que un nombre de activo compuesto solo por caracteres no
+  latinos (p. ej. "日経225" o "恒生指数") colapsaba a la clave canónica
+  vacía `''`. Dos activos así de nombres totalmente distintos se fusionaban
+  silenciosamente al compartir la misma clave vacía — el bug inverso al que
+  esta función pretendía arreglar en la Fase 0. Corregido usando
+  `\p{L}\p{N}` con el flag `u` (conserva letras/números de cualquier
+  alfabeto) y con un *fallback* al nombre recortado/en minúsculas si tras la
+  limpieza no queda ningún carácter alfanumérico reconocido (nombres de solo
+  símbolos/emoji). Con tests de regresión en
+  `frontend/src/lib/__tests__/models.test.js`.
+- **Condición de carrera sin cancelación en el chat de "Consejo IA"**
+  (`AsesorIA.jsx`, función `enviarPregunta`): a diferencia de `pedirConsejo`
+  (que sí cancela la petición anterior con `AbortController`),
+  `enviarPregunta` creaba un controller local que nunca se guardaba en
+  ningún `ref` ni se abortaba en la siguiente llamada. Si el usuario enviaba
+  dos preguntas seguidas rápido, ambas quedaban en vuelo sin cancelarse
+  mutuamente, y si la segunda respuesta llegaba antes que la primera el chat
+  mostraba las respuestas en el orden equivocado; además, al desmontar el
+  componente esa petición quedaba huérfana en segundo plano. Corregido con
+  un `ref` propio (`askAbortRef`, independiente del de `pedirConsejo` porque
+  son peticiones no relacionadas) que aborta la petición anterior y también
+  se aborta al desmontar.
+- **Porcentajes incorrectos en el donut si hay una categoría con valor
+  negativo** (`DonutCategoria.jsx`): el total usado para calcular el % de
+  cada categoría en el tooltip se calculaba sobre los datos ya filtrados
+  (categorías con `valor > 0`), así que si existía una categoría con valor
+  agregado negativo (p. ej. el último valor registrado de un activo es
+  negativo), los porcentajes de las categorías restantes sumaban más del
+  100%. Corregido calculando el total sobre el desglose completo sin
+  filtrar, y añadiendo un aviso visible si hay categorías negativas no
+  representadas en la tarta.
+- **Mes por defecto del formulario en UTC en vez de hora local**
+  (`FormularioEntrada.jsx`): `new Date().toISOString().slice(0, 7)` da el
+  año-mes en UTC; cerca de medianoche local, un usuario en huso horario
+  negativo podía ver precargado el mes siguiente al real (y uno en huso
+  positivo, cerca de fin de mes, el mes anterior). Corregido construyendo el
+  string `YYYY-MM` a partir de los componentes locales de `Date`.
+- **URL con doble barra si `OLLAMA_BASE_URL` termina en `/`**
+  (`tradingagents_wrapper.py`): `OLLAMA_OPENAI_COMPAT_URL` sí normalizaba con
+  `.rstrip("/")`, pero `ask_free_question()` usaba `OLLAMA_BASE_URL` "a
+  pelo" para construir la URL del endpoint nativo de Ollama, dando
+  `http://localhost:11434//api/generate` si alguien exportaba la variable
+  con barra final. Corregido normalizando `OLLAMA_BASE_URL` una sola vez al
+  importar el módulo. Con test de regresión en
+  `backend/tests/test_tradingagents_wrapper.py`.
+- **Contrato de retorno inconsistente en `get_last_price`**
+  (`market_data.py`): devolvía `None` sin datos, un `dict` normal si había
+  éxito, y un `dict` con clave `"error"` en cualquier otra excepción — tres
+  formas de respuesta distintas sin ninguna pista uniforme para el
+  consumidor. (Nota: este endpoint, `/api/market-price`, no lo consume
+  todavía ningún componente del frontend). Corregido para devolver siempre
+  un `dict` con la forma `{ticker, encontrado, precio?, fecha?, error?}`.
+- Verificación final: **33 tests en verde en frontend** (antes 28, +5 de
+  regresión) y **8 en backend** (antes 6, +2). `npm run build`, `npm run
+  lint` y `pytest` en verde. Smoke test manual con Playwright headless
+  contra `vite preview` con el dataset de ejemplo cargado, navegando las 4
+  pestañas y abriendo el panel de detalle: sin errores de consola nuevos
+  (el único error de red es el intento esperado de conectar con el backend
+  de IA, que no estaba corriendo durante la prueba).
+
 ## Pendiente / próximos pasos sugeridos
 
 - Probar la Fase 5 end-to-end con Ollama real instalado (`ollama pull
   qwen3:latest`) y el paquete `tradingagents` instalado desde git — el
   wrapper ya está corregido para el endpoint `/v1` y el modelo recomendado
   actual, pero la llamada de inferencia real sigue sin probarse porque este
-  entorno de build no puede instalar Ollama (ver nota de entorno arriba).
+  entorno de build no puede instalar Ollama (ver nota de entorno arriba;
+  confirmado de nuevo el 2026-08-06, `ollama.com` sigue devolviendo timeout
+  de red en este contenedor).
 - Si se usa en un dispositivo compartido, considerar cifrado o exportación
   periódica del `localStorage` (ya existe el botón "Exportar JSON").
 - Ampliar el detalle por analista del endpoint `/api/advice` parseando el
@@ -374,4 +488,9 @@ paquete `tradingagents` real. Hallazgos y correcciones:
   analista.
 - Considerar code-splitting real del bundle de Recharts (~714 KB sin
   comprimir, ~208 KB gzip) con `React.lazy()` a nivel de componente de
-  gráfica.
+  gráfica (evaluado en esta sesión pero no aplicado: el riesgo de introducir
+  un bug de Suspense/timing en una sesión desatendida no compensaba el
+  beneficio marginal de un bundle que ya funciona bien en local).
+- Si se repite esta sesión sin más hallazgos de calidad nuevos, se puede
+  considerar el proyecto en régimen de mantenimiento normal: revisiones
+  puntuales en vez de auditorías completas cada vez.

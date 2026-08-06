@@ -10,6 +10,23 @@ describe('canonicalKey', () => {
     expect(canonicalKey('S&P 500')).toBe(canonicalKey('SP500'));
     expect(canonicalKey('  s&p 500  ')).toBe(canonicalKey('S&P500'));
   });
+
+  // Regresión de bug crítico corregido en la revisión de calidad del
+  // 2026-08-06: nombres compuestos solo por caracteres no latinos (CJK,
+  // emoji...) colapsaban todos a la clave vacía '' con el regex antiguo
+  // [^a-z0-9]+, fusionando por error activos con nombres totalmente
+  // distintos. Ver PROGRESS.md, sesión 2026-08-06.
+  it('no colapsa a la misma clave nombres distintos compuestos por caracteres no latinos', () => {
+    const nikkei = canonicalKey('日経225');
+    const hangSeng = canonicalKey('恒生指数');
+    expect(nikkei).not.toBe('');
+    expect(hangSeng).not.toBe('');
+    expect(nikkei).not.toBe(hangSeng);
+  });
+
+  it('sigue diferenciando nombres compuestos solo por símbolos/emoji', () => {
+    expect(canonicalKey('🚀')).not.toBe(canonicalKey('🌙'));
+  });
 });
 
 describe('findOrCreateAsset — bug de duplicados (Fase 0)', () => {

@@ -25,12 +25,24 @@ export default function AsesorIA({ assets }) {
   const [usandoMock, setUsandoMock] = useState(false);
   const montado = useRef(true);
   const abortRef = useRef(null);
+  // Ref separado para la petición de `enviarPregunta`: antes no existía y la
+  // función creaba un AbortController local que nunca se guardaba en ningún
+  // ref (bug encontrado en la revisión de calidad del 2026-08-06). Efecto:
+  // (a) si el usuario enviaba dos preguntas seguidas rápido, ambas quedaban
+  // en vuelo sin cancelarse mutuamente, y si la segunda respuesta llegaba
+  // antes que la primera el chat mostraba las respuestas en orden
+  // equivocado; (b) al desmontar el componente solo se abortaba la petición
+  // de `pedirConsejo`, dejando la de `enviarPregunta` corriendo en segundo
+  // plano. Se usa un ref propio (no el de `pedirConsejo`) porque son
+  // peticiones independientes: abortar una no debería cancelar la otra.
+  const askAbortRef = useRef(null);
 
   useEffect(() => {
     montado.current = true;
     return () => {
       montado.current = false;
       abortRef.current?.abort();
+      askAbortRef.current?.abort();
     };
   }, []);
 
@@ -61,7 +73,9 @@ export default function AsesorIA({ assets }) {
     const preguntaActual = pregunta;
     setChat((c) => [...c, { rol: 'user', texto: preguntaActual }]);
     setPregunta('');
+    askAbortRef.current?.abort();
     const controller = new AbortController();
+    askAbortRef.current = controller;
     try {
       const res = await fetch(`${API_BASE}/api/ask`, {
         method: 'POST',

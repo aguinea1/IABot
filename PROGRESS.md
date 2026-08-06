@@ -1,5 +1,131 @@
 # PROGRESS.md — Diario de Inversiones (IABot)
 
+## Sesión del 2026-08-06 (tercera sesión — el PRD ya estaba completo)
+
+### Estado de partida
+
+Al arrancar, `PROGRESS.md` (versión de la sesión del 2026-08-05) indicaba que
+el PRD completo (Fases 0-6) seguía terminado, con 28 tests en frontend, 6 en
+backend, build y lint en verde. Siguiendo la instrucción de "si el proyecto
+ya está completo, haz una revisión de calidad/bugs adicional en vez de
+repetir trabajo", esta sesión se dedicó íntegramente a eso: no se ha tocado
+ninguna fase del PRD ni añadido features nuevas del encargo.
+
+### Qué se hizo hoy
+
+1. **Verificación de partida**: se clonó el repo, se instalaron dependencias
+   (`npm install` en frontend, venv + `pip install -r requirements.txt
+   -r requirements-dev.txt` en backend) y se confirmó que los 28 tests de
+   frontend y los 6 de backend seguían en verde, y que `npm run build`
+   compilaba sin errores, antes de tocar nada.
+2. **Dos rondas de auditoría con un agente de exploración fresco**, cada una
+   sobre un conjunto de archivos que aún no había recibido una revisión tan
+   a fondo en ninguna sesión anterior (backend completo + varios
+   componentes/lib de frontend en la primera ronda; `App.jsx`, el resto de
+   componentes y `models.js`/`normalize.js`/`format.js` en la segunda). Se
+   devolvieron 11 hallazgos reales en total, verificados manualmente uno a
+   uno antes de corregir (ninguno afecta a la restricción "100% gratuito").
+3. **Correcciones aplicadas** (detalle completo con archivo/línea en
+   README.md, sección "Revisión de calidad adicional (tercera sesión de
+   build, 2026-08-06)"):
+   - `npm run lint` no funcionaba en un checkout limpio: `oxlint` no estaba
+     declarado en `devDependencies` pese a estar en el script `lint`.
+     Añadido.
+   - Fuga de conexión SQLite en cada petición a `/api/advice`
+     (`backend/app/cache.py`): `with sqlite3.connect(...)` no cierra la
+     conexión (solo gestiona la transacción). Corregido con `try/finally`.
+   - Robo de foco real en `PanelDetalleActivo.jsx`: el efecto de foco
+     dependía de `onClose`, que cambia de identidad en cada render de
+     `App.jsx` (arrow function inline), robando el foco de vuelta en
+     cualquier re-render mientras el panel estaba abierto. Corregido con un
+     `ref`.
+   - Comparador de `sort` inconsistente para el mismo mes en 4 sitios
+     (`aggregations.js` ×2, `PanelDetalleActivo.jsx`, `TablaEntradas.jsx`):
+     nunca devolvía `0`, violando el contrato de `sort`. Corregido con
+     comparador de 3 vías en los cuatro.
+   - Categorías "fantasma" con valor 0€ en `desgloseCategoria` para activos
+     sin ninguna entrada. Corregido.
+   - **Bug crítico de identidad en `canonicalKey`** (`lib/normalize.js`):
+     nombres compuestos solo por caracteres no latinos (CJK, etc.)
+     colapsaban a la clave canónica vacía, fusionando por error activos de
+     nombres totalmente distintos — el bug inverso al que esta función
+     arregló en la Fase 0. Corregido con `\p{L}\p{N}` unicode + fallback.
+   - Condición de carrera sin cancelar en `enviarPregunta` de `AsesorIA.jsx`
+     (a diferencia de `pedirConsejo`, no usaba `AbortController`). Corregido
+     con un `ref` propio.
+   - Porcentajes del donut incorrectos si hay una categoría con valor
+     negativo (`DonutCategoria.jsx`): el total se calculaba sobre los datos
+     ya filtrados. Corregido + aviso visible si hay negativos.
+   - Mes por defecto del formulario en UTC en vez de hora local
+     (`FormularioEntrada.jsx`). Corregido.
+   - URL con doble barra si `OLLAMA_BASE_URL` termina en `/`
+     (`tradingagents_wrapper.py`, `ask_free_question`). Corregido
+     normalizando una sola vez al importar el módulo.
+   - Contrato de retorno inconsistente en `market_data.get_last_price`
+     (`None` / `dict` / `dict` con `error` según el caso). Corregido a una
+     forma uniforme.
+4. **Tests nuevos**: `frontend/src/lib/__tests__/aggregations.test.js` (2,
+   sort estable + categorías fantasma), `frontend/src/__tests__/components.test.jsx`
+   (+1, no robar foco en re-render), `frontend/src/lib/__tests__/models.test.js`
+   (+2, `canonicalKey` con nombres CJK/emoji), `backend/tests/test_tradingagents_wrapper.py`
+   (2, normalización de `OLLAMA_BASE_URL`). Total: **33 tests en verde en
+   frontend** (antes 28), **8 en backend** (antes 6).
+5. **Se intentó de nuevo instalar/alcanzar Ollama** (`curl
+   https://ollama.com/install.sh` y `https://ollama.com`): sigue sin ser
+   posible desde este entorno de build (timeout de red / lista blanca), tal
+   y como se documentó en las dos sesiones anteriores. La Fase 5 sigue
+   completa a nivel de código, probada en modo mock, pendiente de prueba
+   real en una máquina con Ollama.
+6. **Verificación final**: smoke test manual con Playwright headless contra
+   `vite preview` (build de producción), cargando el dataset de ejemplo,
+   navegando las 4 pestañas y abriendo el panel de detalle de un activo —
+   sin errores de consola nuevos, capturas en escritorio y móvil (390×844)
+   revisadas visualmente. `npm run build`, `npm run lint`, `npm run test` y
+   `pytest` en verde al cerrar la sesión.
+
+### En qué se quedó / próxima sesión
+
+**Todo compila, testea y arranca correctamente, sin ningún cambio a medias.**
+Comandos de verificación (todos en verde a fecha de hoy):
+
+```bash
+cd frontend && npm install && npm run test -- --run   # 33/33
+cd frontend && npm run build                           # sin errores
+cd frontend && npm run lint                            # solo 1 warning cosmético preexistente
+cd backend && pip install -r requirements.txt -r requirements-dev.txt && python -m pytest tests/ -q  # 8/8
+```
+
+Próximos pasos si se retoma (sin cambios respecto a la sesión anterior,
+salvo la nota de red confirmada de nuevo):
+
+1. Si hay acceso a una máquina con Ollama instalado (fuera de este entorno
+   de build, que sigue sin poder alcanzar `ollama.com`): `ollama pull
+   qwen3:latest`, instalar `tradingagents` desde git, y probar `/api/advice`
+   y `/api/ask` en modo real.
+2. Revisar de vez en cuando el catálogo de modelos de Ollama de
+   `tradingagents` por si cambia con nuevas versiones del paquete.
+3. Considerar code-splitting real del bundle de Recharts con
+   `React.lazy()` — evaluado hoy, no aplicado (riesgo/beneficio no lo
+   justificaba en una sesión desatendida).
+4. Si esta sesión se repite sin más hallazgos de calidad nuevos, pasar a
+   régimen de mantenimiento normal (revisiones puntuales, no auditorías
+   completas cada vez) — ya van tres rondas de auditoría consecutivas sin
+   encontrar nada que comprometiera la funcionalidad core.
+
+### Decisiones de diseño de hoy
+
+- No se optimizó el bundle con code-splitting pese a estar en la lista de
+  "próximos pasos" de la sesión anterior: se evaluó el riesgo de introducir
+  un bug de `Suspense`/timing sin nadie disponible para verificarlo
+  interactivamente, y no compensaba frente al beneficio marginal.
+- El `ref` de cancelación de `enviarPregunta` en `AsesorIA.jsx` se mantuvo
+  separado del de `pedirConsejo` a propósito: son peticiones independientes
+  y abortar una no debería cancelar la otra.
+- Ningún hallazgo de las dos rondas de auditoría de hoy comprometía la
+  restricción de "100% gratuito".
+
+---
+
 ## Sesión del 2026-08-04 (primera sesión — repo inicializado desde cero)
 
 ### Estado: TODAS las fases del PRD (0 a 6) completadas en esta única sesión
