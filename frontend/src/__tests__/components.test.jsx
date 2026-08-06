@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import AsesorIA from '../components/AsesorIA';
 import DuplicadosPanel from '../components/DuplicadosPanel';
 import PanelDetalleActivo from '../components/PanelDetalleActivo';
+import FormularioEntrada from '../components/FormularioEntrada';
 import { CATEGORIAS, createAsset } from '../lib/models';
 
 // Regresión de bugs corregidos en la revisión de calidad del 2026-08-05:
@@ -70,5 +71,22 @@ describe('PanelDetalleActivo — no roba el foco en cada re-render', () => {
     expect(document.activeElement).toBe(input);
 
     document.body.removeChild(input);
+  });
+});
+
+// Regresión de bug corregido en la revisión de calidad del 2026-08-07
+// (sesión de madrugada): los <label> de FormularioEntrada no estaban
+// asociados a su <input>/<select> vía htmlFor/id (a diferencia de
+// AsesorIA.jsx, que ya se corrigió el 2026-08-05), así que un lector de
+// pantalla no anunciaba el nombre del campo al enfocarlo. Ver PROGRESS.md.
+describe('FormularioEntrada — labels asociados a sus campos', () => {
+  it('cada campo del formulario es localizable por su etiqueta accesible', () => {
+    render(<FormularioEntrada assets={[]} onAdd={vi.fn()} />);
+    expect(screen.getByLabelText(/nombre del activo/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^categoría$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^mes$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^modo$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/valor total/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/aportación este mes/i)).toBeInTheDocument();
   });
 });

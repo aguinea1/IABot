@@ -43,8 +43,8 @@ export default function FormularioEntrada({ assets, onAdd }) {
       <p className="panel-sub">El nombre se normaliza automáticamente: "S&P 500", "s&p500" y "SP500" se tratan como el mismo activo.</p>
       <div className="form-grid">
         <div>
-          <label>Nombre del activo</label>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="ej. S&P 500" required />
+          <label htmlFor="fe-nombre">Nombre del activo</label>
+          <input id="fe-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="ej. S&P 500" required />
           {sugerencias.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--series-1)', marginTop: 3 }}>
               ¿Quizás: {sugerencias.map((s) => (
@@ -56,42 +56,42 @@ export default function FormularioEntrada({ assets, onAdd }) {
           )}
         </div>
         <div>
-          <label>Categoría</label>
-          <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+          <label htmlFor="fe-categoria">Categoría</label>
+          <select id="fe-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
             {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
-          <label>Mes</label>
-          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} required />
+          <label htmlFor="fe-mes">Mes</label>
+          <input id="fe-mes" type="month" value={mes} onChange={(e) => setMes(e.target.value)} required />
         </div>
         <div>
-          <label>Modo</label>
-          <select value={modo} onChange={(e) => setModo(e.target.value)}>
+          <label htmlFor="fe-modo">Modo</label>
+          <select id="fe-modo" value={modo} onChange={(e) => setModo(e.target.value)}>
             <option value="valor">Valor directo</option>
             <option value="participaciones">Participaciones + precio</option>
           </select>
         </div>
         {modo === 'valor' ? (
           <div>
-            <label>Valor total (€)</label>
-            <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
+            <label htmlFor="fe-valor">Valor total (€)</label>
+            <input id="fe-valor" type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
           </div>
         ) : (
           <>
             <div>
-              <label>Participaciones</label>
-              <input type="number" step="0.0001" value={participaciones} onChange={(e) => setParticipaciones(e.target.value)} />
+              <label htmlFor="fe-participaciones">Participaciones</label>
+              <input id="fe-participaciones" type="number" step="0.0001" value={participaciones} onChange={(e) => setParticipaciones(e.target.value)} />
             </div>
             <div>
-              <label>Precio unitario (€)</label>
-              <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} />
+              <label htmlFor="fe-precio">Precio unitario (€)</label>
+              <input id="fe-precio" type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} />
             </div>
           </>
         )}
         <div>
-          <label>Aportación este mes (€, opcional)</label>
-          <input type="number" step="0.01" value={aportacion} onChange={(e) => setAportacion(e.target.value)} />
+          <label htmlFor="fe-aportacion">Aportación este mes (€, opcional)</label>
+          <input id="fe-aportacion" type="number" step="0.01" value={aportacion} onChange={(e) => setAportacion(e.target.value)} />
         </div>
         <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
           <Plus size={14} /> Añadir

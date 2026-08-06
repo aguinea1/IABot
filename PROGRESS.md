@@ -1,5 +1,136 @@
 # PROGRESS.md — Diario de Inversiones (IABot)
 
+## Sesión del 2026-08-07 (madrugada — cuarta sesión, el PRD ya estaba completo)
+
+### Estado de partida
+
+Al arrancar (clonado a las ~23:08 UTC del 2026-08-06, franja de madrugada
+01:00-04:00 hora de Madrid), `PROGRESS.md` (versión de la tercera sesión,
+2026-08-06 tarde) indicaba el PRD completo (Fases 0-6), 33 tests en frontend,
+8 en backend, build/lint en verde, y una recomendación explícita: "si esta
+sesión se repite sin más hallazgos de calidad nuevos, pasar a régimen de
+mantenimiento normal (revisiones puntuales, no auditorías completas cada
+vez)". Se siguió esa recomendación al pie de la letra.
+
+### Qué se hizo hoy
+
+1. **Verificación de partida**: se clonó el repo, se instalaron dependencias
+   (`npm install` en frontend; venv + `pip install -r requirements.txt -r
+   requirements-dev.txt` en backend) y se confirmó que los 33 tests de
+   frontend y los 8 de backend seguían en verde, y `npm run build`/`npm run
+   lint` en verde, antes de tocar nada.
+2. **Una única ronda ligera de revisión** (no dos rondas de auditoría
+   exhaustiva como las tres sesiones anteriores) con un agente de
+   exploración, con instrucciones explícitas de buscar solo bugs
+   funcionales de alta confianza y no repetir nada ya evaluado en
+   `PROGRESS.md`. Ámbito: `backend/app/` completo, `aggregations.js`/
+   `metrics.js`, y los componentes de frontend con menos atención previa
+   (`RankingChart.jsx`, `HeatmapMensual.jsx`, `VistaPorTipo.jsx`,
+   `KpiCard.jsx`, `Skeleton.jsx`).
+3. **Además, revisión manual propia** de accesibilidad (asociación de
+   `<label>` con sus campos) en los componentes de formulario, que no
+   estaba dentro del ámbito pedido al agente — encontró el hallazgo más
+   importante de la sesión (ver abajo).
+4. **Hallazgos reales y correcciones aplicadas** (detalle completo con
+   archivo/línea en README.md, sección "Revisión de calidad adicional
+   (cuarta sesión de build, 2026-08-07, madrugada)"):
+   - **Accesibilidad**: `FormularioEntrada.jsx` (el formulario más usado de
+     la app) tenía sus 8 `<label>` sin asociar a su campo (`htmlFor`/`id`) —
+     el mismo tipo de bug que ya se había corregido en `AsesorIA.jsx` el
+     2026-08-05, pero que se había pasado por alto en este componente.
+     Corregido. De paso, `aria-label` añadido al filtro de
+     `TablaEntradas.jsx` (solo tenía `placeholder`).
+   - `RankingChart.jsx` ocultaba en silencio activos con aportación neta
+     acumulada <= 0 (p. ej. una retirada parcial mayor a lo aportado ese
+     mes) pese a tener valor de mercado real, inconsistente con
+     `PanelDetalleActivo.jsx`. Corregido.
+   - `RankingChart.jsx` usaba el nombre del activo (no `assetId`) como
+     `key` de React, arriesgando colisión entre dos activos con el mismo
+     nombre que el usuario decide no fusionar. Corregido.
+   - Se extrajo la lógica de datos de `RankingChart.jsx` a una función pura
+     nueva, `rankingActivos()`, en `frontend/src/lib/aggregations.js` (mismo
+     patrón que `porActivo()`), para poder testearla sin depender del
+     renderizado de Recharts.
+5. **Tests nuevos**: `frontend/src/__tests__/components.test.jsx` (+1,
+   labels de `FormularioEntrada` localizables por `getByLabelText`),
+   `frontend/src/lib/__tests__/aggregations.test.js` (+3, `rankingActivos`),
+   y `frontend/src/__tests__/components_extra.test.jsx` (+5, tests de
+   comportamiento base para `HeatmapMensual.jsx`, `KpiCard.jsx` y
+   `VistaPorTipo.jsx`, que solo se ejercitaban de forma indirecta vía
+   `App.test.jsx` — no son regresiones de bugs concretos, sino cobertura
+   nueva). Total: **42 tests en verde en frontend** (antes 33). Backend sin
+   cambios: **8 tests en verde** (no se tocó nada de backend esta vez, más
+   allá de releerlo — el agente no encontró nada de confianza alta ahí).
+6. **Se intentó de nuevo `curl https://ollama.com/install.sh`**: sigue
+   devolviendo `403` (lista blanca de red de este contenedor de build), sin
+   cambios respecto a las tres sesiones anteriores.
+7. **Smoke test manual con Playwright headless** contra `vite preview`
+   (build de producción): dataset de ejemplo, las 4 pestañas, capturas en
+   escritorio y móvil, sin errores de consola inesperados. Playwright se
+   instaló temporalmente solo para esta verificación (`npm install --no-save
+   playwright`); no queda como dependencia del proyecto ni el script queda
+   en el repo.
+8. **Verificación final**: `npm run test -- --run` (42/42), `npm run build`
+   sin errores, `npm run lint` (solo el warning cosmético preexistente de
+   `normalize.js`), `pytest` en backend (8/8).
+
+### En qué se quedó / próxima sesión
+
+**Todo compila, testea y arranca correctamente, sin ningún cambio a medias.**
+
+```bash
+cd frontend && npm install && npm run test -- --run   # 42/42
+cd frontend && npm run build                           # sin errores
+cd frontend && npm run lint                            # solo 1 warning cosmético preexistente
+cd backend && pip install -r requirements.txt -r requirements-dev.txt && python -m pytest tests/ -q  # 8/8
+```
+
+Próximos pasos si se retoma:
+
+1. Si hay acceso a una máquina con Ollama instalado (sigue bloqueado desde
+   este entorno de build): `ollama pull qwen3:latest`, instalar
+   `tradingagents` desde git, y probar `/api/advice` y `/api/ask` en modo
+   real.
+2. Revisar de vez en cuando el catálogo de modelos de Ollama de
+   `tradingagents` por si cambia con nuevas versiones del paquete.
+3. Considerar code-splitting real del bundle de Recharts (~715 KB) con
+   `React.lazy()` — evaluado en sesiones anteriores, no aplicado por
+   riesgo/beneficio en sesión desatendida; sigue siendo una opción si algún
+   día hay alguien disponible para verificar interactivamente.
+4. **Ya van cuatro sesiones de auditoría consecutivas** (dos completas + dos
+   ligeras) sin ningún hallazgo que comprometiera la funcionalidad core, y
+   esta ronda ligera (más pequeña que las anteriores) siguió encontrando
+   bugs reales aunque menores — así que el régimen de mantenimiento normal
+   parece razonable pero no "agotado": si se repite esta sesión, seguir con
+   una ronda ligera y selectiva (no exhaustiva) en vez de dos rondas
+   completas, priorizando componentes/archivos con menos revisión previa
+   (`HeatmapMensual.jsx`, `VistaPorTipo.jsx`, `KpiCard.jsx`, `Skeleton.jsx`,
+   `usePortfolio.js` siguen sin un hallazgo real propio, aunque ya se han
+   mirado por encima).
+5. Si el proyecto pasa a usarse de verdad, considerar cifrado o backup
+   automático del `localStorage` más allá del botón manual "Exportar JSON".
+
+### Decisiones de diseño de hoy
+
+- Se extrajo `rankingActivos()` a `lib/aggregations.js` en vez de dejar la
+  lógica inline en `RankingChart.jsx`: no solo corrige el bug, sino que
+  sigue el patrón ya establecido en el proyecto (lógica pura en `lib/`,
+  presentación en `components/`) y permite testear sin necesidad de simular
+  el tamaño del contenedor de Recharts en jsdom (se intentó primero un test
+  de componente con `getBoundingClientRect()` mockeado; funcionaba a medias
+  pero los ticks del eje Y no siempre se renderizaban de forma fiable en
+  jsdom, así que se prefirió la solución más simple y mantenible).
+- El hallazgo de accesibilidad de `FormularioEntrada.jsx` no salió de la
+  ronda del agente (que tenía un ámbito distinto) sino de una revisión
+  manual propia — se documenta para que quede claro que "una ronda ligera
+  con agente" no sustituye del todo un vistazo manual a los componentes más
+  usados, aunque el volumen de trabajo total de la sesión sea menor que en
+  sesiones anteriores.
+- Ningún hallazgo de hoy compromete la restricción de "100% gratuito" (no
+  se tocó nada de la Fase 5 ni de ningún servicio de pago).
+
+---
+
 ## Sesión del 2026-08-06 (tercera sesión — el PRD ya estaba completo)
 
 ### Estado de partida

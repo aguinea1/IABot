@@ -105,3 +105,17 @@ export function porActivo(assets, entries) {
     return { asset, aportado, valorActual, rendimiento, rentabilidadPct };
   });
 }
+
+// Datos listos para RankingChart, ordenados por rentabilidad descendente.
+// Extraído de RankingChart.jsx a esta capa de lib para poder testearlo sin
+// depender del renderizado de Recharts (bug encontrado en la revisión de
+// calidad del 2026-08-07: el filtro `aportado > 0` ocultaba en silencio
+// activos con aportación neta acumulada <= 0 pero valor de mercado real,
+// p.ej. tras una retirada parcial superior a lo aportado ese mes —
+// inconsistente con PanelDetalleActivo, que sí los muestra. Ver PROGRESS.md).
+export function rankingActivos(assets, entries) {
+  return porActivo(assets, entries)
+    .filter((p) => p.aportado !== 0 || p.valorActual !== 0)
+    .sort((a, b) => b.rentabilidadPct - a.rentabilidadPct)
+    .map((p) => ({ nombre: p.asset.nombre, pct: Number(p.rentabilidadPct.toFixed(1)), rendimiento: p.rendimiento, assetId: p.asset.id }));
+}

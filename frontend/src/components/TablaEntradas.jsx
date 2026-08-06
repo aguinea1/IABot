@@ -16,7 +16,7 @@ export default function TablaEntradas({ assets, entries, onRemove, onRowClick })
 
   return (
     <div>
-      <input placeholder="Filtrar por activo…" value={filtro} onChange={(e) => setFiltro(e.target.value)} style={{ marginBottom: 10, width: 220 }} />
+      <input aria-label="Filtrar por activo" placeholder="Filtrar por activo…" value={filtro} onChange={(e) => setFiltro(e.target.value)} style={{ marginBottom: 10, width: 220 }} />
       <div style={{ maxHeight: 320, overflowY: 'auto' }}>
         <table className="table-ledger">
           <thead>

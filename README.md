@@ -471,6 +471,82 @@ restricción "100% gratuito". Hallazgos y correcciones:
   (el único error de red es el intento esperado de conectar con el backend
   de IA, que no estaba corriendo durante la prueba).
 
+## Revisión de calidad adicional (cuarta sesión de build, 2026-08-07, madrugada)
+
+El proyecto seguía completo (PRD 0-6) al arrancar, con las tres sesiones
+anteriores ya sin hallazgos que comprometieran la funcionalidad core. Siguiendo
+la recomendación explícita que la propia sesión anterior dejó en
+`PROGRESS.md` ("si se repite sin más hallazgos, pasar a régimen de
+mantenimiento normal"), esta sesión hizo **una única ronda ligera y
+selectiva** (no dos rondas de auditoría exhaustiva como las tres sesiones
+previas) con un agente de exploración, centrada en archivos backend y de
+frontend que aún no habían recibido tanta atención (`RankingChart.jsx`,
+`HeatmapMensual.jsx`, `VistaPorTipo.jsx`, `KpiCard.jsx`, `Skeleton.jsx`) más
+una relectura manual de `main.py`/`cache.py`. Hallazgos reales:
+
+- **Accesibilidad: labels sin asociar en el formulario principal**
+  (`FormularioEntrada.jsx`): a diferencia de `AsesorIA.jsx` (corregido el
+  2026-08-05), los 8 campos del formulario de "Añadir movimiento" —el más
+  usado de la app— tenían `<label>` como hermano del `<input>`/`<select>`
+  en vez de asociado vía `htmlFor`/`id`, así que un lector de pantalla no
+  anunciaba el nombre del campo al enfocarlo. Corregido añadiendo
+  `id`/`htmlFor` a los 8 pares. De paso se añadió `aria-label` al campo de
+  filtro de `TablaEntradas.jsx`, que tenía el mismo problema (solo
+  `placeholder`, sin label accesible). Con test de regresión en
+  `frontend/src/__tests__/components.test.jsx`.
+- **`RankingChart.jsx` ocultaba en silencio activos con aportación neta
+  <= 0**: el filtro `.filter((p) => p.aportado > 0)` descartaba cualquier
+  activo cuya aportación acumulada fuera 0 o negativa (p. ej. una retirada
+  parcial superior a lo aportado ese mes), aunque siguiera teniendo valor de
+  mercado real — inconsistente con `PanelDetalleActivo.jsx`, que muestra el
+  mismo activo sin problema usando el mismo `porActivo()`. Corregido
+  filtrando solo los activos realmente sin datos (`aportado === 0 &&
+  valorActual === 0`).
+- **`RankingChart.jsx` usaba el nombre del activo como `key` de React** en
+  vez de `assetId` (que ya estaba disponible en los mismos datos): dos
+  activos con el mismo nombre normalizado que el usuario decide no fusionar
+  (`DuplicadosPanel` solo lo sugiere, la fusión es opcional) colisionarían
+  en la `key`, arriesgando que React reutilizara/desincronizara el color o
+  la posición de la barra equivocada entre re-renders. El resto de la app
+  (`EvolucionChart.jsx`) ya usa `asset.id` como key precisamente por este
+  motivo. Corregido usando `assetId`.
+  - Con los dos bugs de `RankingChart.jsx` de por medio, se aprovechó para
+    extraer la lógica de datos del componente (filtrado + orden + mapeo) a
+    una función pura nueva, `rankingActivos()` en
+    `frontend/src/lib/aggregations.js`, siguiendo el mismo patrón que
+    `porActivo()`/`desgloseCategoria()`: así se puede testear con datos
+    puros sin depender del renderizado de Recharts en jsdom (que requiere
+    simular `getBoundingClientRect()`, nada trivial). Con 3 tests de
+    regresión en `frontend/src/lib/__tests__/aggregations.test.js`.
+- No se encontró ningún hallazgo de confianza alta en `backend/app/`
+  (`cache.py`, `main.py`, `market_data.py`, `tradingagents_wrapper.py`) ni
+  en `HeatmapMensual.jsx`, `VistaPorTipo.jsx`, `KpiCard.jsx`, `Skeleton.jsx`,
+  `aggregations.js`/`metrics.js` (solo un caso marginal de baja confianza en
+  `hhi()` con categorías de valor negativo, descartado por no darse en la
+  práctica con los tipos de activo soportados — ver comentario en el propio
+  código de `metrics.js` si se quiere revisar en el futuro).
+- Se intentó de nuevo `curl https://ollama.com/install.sh`: sigue devolviendo
+  `403` (lista blanca de red de este contenedor), como en las tres sesiones
+  anteriores. Sin cambios respecto a esa limitación documentada.
+- **Cobertura de tests ampliada** para tres componentes que hasta ahora solo
+  se ejercitaban de forma indirecta a través de `App.test.jsx`
+  (`HeatmapMensual.jsx`, `KpiCard.jsx`, `VistaPorTipo.jsx`): no son
+  regresiones de bugs concretos, sino tests de comportamiento base
+  (`frontend/src/__tests__/components_extra.test.jsx`, 5 tests) para que
+  futuras sesiones detecten roturas antes en estos componentes.
+- **Smoke test manual con Playwright headless** contra `vite preview`
+  (build de producción): dataset de ejemplo cargado, las 4 pestañas
+  navegadas, capturas en escritorio (1280×900) y móvil (390×844) — sin
+  errores de consola inesperados (el único error de red es el intento
+  esperado de conectar con el backend de IA, que no estaba corriendo). El
+  script de la prueba fue una herramienta ad-hoc de esta sesión, no se
+  incorpora al repo como dependencia permanente (Playwright no está en
+  `devDependencies`; se instaló temporalmente solo para esta verificación).
+- Verificación final: **42 tests en verde en frontend** (antes 33: +4 de
+  regresión de bugs + 5 de cobertura nueva) y **8 en backend** (sin
+  cambios, no se tocó nada de backend). `npm run build` y `npm run lint`
+  en verde (mismo único warning cosmético preexistente de `normalize.js`).
+
 ## Pendiente / próximos pasos sugeridos
 
 - Probar la Fase 5 end-to-end con Ollama real instalado (`ollama pull
