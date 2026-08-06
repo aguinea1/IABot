@@ -119,21 +119,36 @@ def get_advice(ticker: str, categoria: str | None = None) -> dict:
         return resp
 
 
-def ask_free_question(ticker: str, pregunta: str) -> str:
-    if not _tradingagents_available:
-        return (
-            f"(mock) No hay backend de TradingAgents/Ollama disponible en este entorno. "
-            f"Con Ollama corriendo y el modelo '{OLLAMA_MODEL}' instalado, aquí verías una "
-            f"respuesta real generada localmente sobre tu pregunta para {ticker}: \"{pregunta}\"."
-        )
-    try:
-        import httpx
+def _mock_ask_response(ticker: str, pregunta: str) -> str:
+    return (
+        f"(mock) No hay backend de TradingAgents/Ollama disponible en este entorno. "
+        f"Con Ollama corriendo y el modelo '{OLLAMA_MODEL}' instalado, aquí verías una "
+        f"respuesta real generada localmente sobre tu pregunta para {ticker}: \"{pregunta}\"."
+    )
 
-        prompt = (
-            f"Eres un analista de inversiones. Sobre el activo {ticker}, responde de forma "
-            f"breve y en español a esta pregunta, dejando claro que es una opinión generada "
-            f"por IA y no asesoramiento financiero real: {pregunta}"
-        )
+
+def ask_free_question(ticker: str, pregunta: str) -> str:
+    # A diferencia de `get_advice()`, esta función NO usa el paquete
+    # `tradingagents` en absoluto: llama directamente al endpoint nativo
+    # /api/generate de Ollama vía httpx. Bug encontrado en la revisión de
+    # calidad del 2026-08-07 (sesión de madrugada): antes se comprobaba
+    # `_tradingagents_available` (si el paquete `tradingagents` se pudo
+    # importar) para decidir si intentar la llamada real o devolver
+    # directamente el mock — así que alguien con Ollama corriendo pero sin
+    # el paquete `tradingagents` instalado (o con una instalación fallida,
+    # p.ej. por incompatibilidad de versión) se encontraba con el mock en
+    # "Pregunta libre" aunque una respuesta real fuera perfectamente posible.
+    # Ahora se intenta siempre la llamada real a Ollama y solo se cae al mock
+    # si la petición falla de verdad (Ollama no está corriendo, timeout,
+    # etc.), igual que ya hacía `get_advice()` con TradingAgentsGraph.
+    import httpx
+
+    prompt = (
+        f"Eres un analista de inversiones. Sobre el activo {ticker}, responde de forma "
+        f"breve y en español a esta pregunta, dejando claro que es una opinión generada "
+        f"por IA y no asesoramiento financiero real: {pregunta}"
+    )
+    try:
         r = httpx.post(
             f"{OLLAMA_BASE_URL}/api/generate",
             json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
@@ -141,5 +156,12 @@ def ask_free_question(ticker: str, pregunta: str) -> str:
         )
         r.raise_for_status()
         return r.json().get("response", "(sin respuesta del modelo)")
+    except (httpx.ConnectError, httpx.TimeoutException):
+        # Ollama no está corriendo/alcanzable: mismo mensaje amigable de
+        # mock que usa el resto de la app, no un error técnico.
+        return _mock_ask_response(ticker, pregunta)
     except Exception as e:
+        # Ollama sí responde pero algo falló (p.ej. modelo no descargado,
+        # HTTP 4xx/5xx): mostramos el error tal cual para poder depurarlo,
+        # en vez de un mock genérico que ocultaría el problema real.
         return f"(error consultando Ollama: {e})"

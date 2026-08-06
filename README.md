@@ -518,13 +518,33 @@ una relectura manual de `main.py`/`cache.py`. Hallazgos reales:
     puros sin depender del renderizado de Recharts en jsdom (que requiere
     simular `getBoundingClientRect()`, nada trivial). Con 3 tests de
     regresión en `frontend/src/lib/__tests__/aggregations.test.js`.
-- No se encontró ningún hallazgo de confianza alta en `backend/app/`
-  (`cache.py`, `main.py`, `market_data.py`, `tradingagents_wrapper.py`) ni
-  en `HeatmapMensual.jsx`, `VistaPorTipo.jsx`, `KpiCard.jsx`, `Skeleton.jsx`,
-  `aggregations.js`/`metrics.js` (solo un caso marginal de baja confianza en
-  `hhi()` con categorías de valor negativo, descartado por no darse en la
-  práctica con los tipos de activo soportados — ver comentario en el propio
-  código de `metrics.js` si se quiere revisar en el futuro).
+- El agente de exploración no encontró ningún hallazgo de confianza alta en
+  `backend/app/` (`cache.py`, `main.py`, `market_data.py`,
+  `tradingagents_wrapper.py`) ni en `HeatmapMensual.jsx`, `VistaPorTipo.jsx`,
+  `KpiCard.jsx`, `Skeleton.jsx`, `aggregations.js`/`metrics.js` (solo un caso
+  marginal de baja confianza en `hhi()` con categorías de valor negativo,
+  descartado por no darse en la práctica con los tipos de activo soportados
+  — ver comentario en el propio código de `metrics.js` si se quiere revisar
+  en el futuro). Una relectura manual propia (fuera del ámbito pedido al
+  agente) sí encontró un bug real en `tradingagents_wrapper.py` — ver abajo.
+- **`ask_free_question()` caía al mock innecesariamente si `tradingagents` no
+  estaba instalado**, aunque Ollama estuviera corriendo
+  (`backend/app/tradingagents_wrapper.py`): esta función no usa el paquete
+  `tradingagents` en absoluto (llama directamente al endpoint nativo
+  `/api/generate` de Ollama vía `httpx`), pero decidía si intentar la
+  llamada real o devolver el mock mirando `_tradingagents_available` (si el
+  paquete `tradingagents` se pudo importar) — la misma guarda que sí tiene
+  sentido en `get_advice()` (que sí necesita `TradingAgentsGraph`). Alguien
+  con Ollama corriendo pero sin `tradingagents` instalado (o con una
+  instalación fallida por incompatibilidad de versión) se encontraba con el
+  mock en "Pregunta libre" aunque una respuesta real fuera perfectamente
+  posible. Corregido: se intenta siempre la llamada real y solo se cae al
+  mensaje de mock si la conexión falla de verdad
+  (`httpx.ConnectError`/`TimeoutException`); si Ollama responde con un error
+  real (p.ej. modelo no descargado) se muestra ese error tal cual en vez de
+  ocultarlo tras un mock genérico. Con 3 tests de regresión en
+  `backend/tests/test_tradingagents_wrapper.py` (`httpx.post` mockeado para
+  simular los tres casos: no alcanzable, error real, respuesta real).
 - Se intentó de nuevo `curl https://ollama.com/install.sh`: sigue devolviendo
   `403` (lista blanca de red de este contenedor), como en las tres sesiones
   anteriores. Sin cambios respecto a esa limitación documentada.
@@ -549,9 +569,9 @@ una relectura manual de `main.py`/`cache.py`. Hallazgos reales:
   0 warnings. De paso se añadió `venv` a `.gitignore` (esta sesión usó
   `backend/venv/`, no cubierto hasta ahora, solo `.venv`).
 - Verificación final: **42 tests en verde en frontend** (antes 33: +4 de
-  regresión de bugs + 5 de cobertura nueva) y **8 en backend** (sin
-  cambios, no se tocó nada de backend). `npm run build` sin errores y
-  `npm run lint` en 0 warnings.
+  regresión de bugs + 5 de cobertura nueva) y **11 en backend** (antes 8,
+  +3 de regresión del bug de `ask_free_question()`). `npm run build` sin
+  errores y `npm run lint` en 0 warnings.
 
 ## Pendiente / próximos pasos sugeridos
 

@@ -58,9 +58,20 @@ vez)". Se siguió esa recomendación al pie de la letra.
    comportamiento base para `HeatmapMensual.jsx`, `KpiCard.jsx` y
    `VistaPorTipo.jsx`, que solo se ejercitaban de forma indirecta vía
    `App.test.jsx` — no son regresiones de bugs concretos, sino cobertura
-   nueva). Total: **42 tests en verde en frontend** (antes 33). Backend sin
-   cambios: **8 tests en verde** (no se tocó nada de backend esta vez, más
-   allá de releerlo — el agente no encontró nada de confianza alta ahí).
+   nueva). Total: **42 tests en verde en frontend** (antes 33).
+5b. **Revisión manual propia de `backend/app/` fuera del ámbito pedido al
+   agente** (que no había encontrado nada ahí): `ask_free_question()`
+   (`tradingagents_wrapper.py`) decidía si intentar la llamada real a Ollama
+   o devolver directamente el mock mirando `_tradingagents_available` (si el
+   paquete `tradingagents` se pudo importar) — pero esta función no usa ese
+   paquete en absoluto, llama a Ollama vía `httpx` directamente. Alguien con
+   Ollama corriendo pero sin `tradingagents` instalado se encontraba con el
+   mock en "Pregunta libre" sin necesidad. Corregido: se intenta siempre la
+   llamada real; solo se cae al mock si la conexión falla de verdad
+   (`ConnectError`/`TimeoutException`), y un error real de Ollama (modelo no
+   descargado, etc.) se muestra tal cual en vez de ocultarse. Con 3 tests de
+   regresión en `backend/tests/test_tradingagents_wrapper.py`. Backend:
+   **11 tests en verde** (antes 8, +3).
 6. **Se intentó de nuevo `curl https://ollama.com/install.sh`**: sigue
    devolviendo `403` (lista blanca de red de este contenedor de build), sin
    cambios respecto a las tres sesiones anteriores.
@@ -79,7 +90,7 @@ vez)". Se siguió esa recomendación al pie de la letra.
    esta sesión creó el virtualenv de backend como `backend/venv/` y no
    estaba cubierto.
 10. **Verificación final**: `npm run test -- --run` (42/42), `npm run build`
-    sin errores, `npm run lint` (0 warnings), `pytest` en backend (8/8).
+    sin errores, `npm run lint` (0 warnings), `pytest` en backend (11/11).
 11. **Se reinstaló `tradingagents` (git, misma v0.3.1) temporalmente** para
     seguir el "próximo paso" ya apuntado de revisar de vez en cuando su
     catálogo de modelos de Ollama. Confirmado sin cambios: sigue
@@ -98,7 +109,7 @@ vez)". Se siguió esa recomendación al pie de la letra.
 cd frontend && npm install && npm run test -- --run   # 42/42
 cd frontend && npm run build                           # sin errores
 cd frontend && npm run lint                            # 0 warnings (limpiado hoy)
-cd backend && pip install -r requirements.txt -r requirements-dev.txt && python -m pytest tests/ -q  # 8/8
+cd backend && pip install -r requirements.txt -r requirements-dev.txt && python -m pytest tests/ -q  # 11/11
 ```
 
 Próximos pasos si se retoma:
@@ -116,13 +127,15 @@ Próximos pasos si se retoma:
 4. **Ya van cuatro sesiones de auditoría consecutivas** (dos completas + dos
    ligeras) sin ningún hallazgo que comprometiera la funcionalidad core, y
    esta ronda ligera (más pequeña que las anteriores) siguió encontrando
-   bugs reales aunque menores — así que el régimen de mantenimiento normal
-   parece razonable pero no "agotado": si se repite esta sesión, seguir con
-   una ronda ligera y selectiva (no exhaustiva) en vez de dos rondas
-   completas, priorizando componentes/archivos con menos revisión previa
-   (`HeatmapMensual.jsx`, `VistaPorTipo.jsx`, `KpiCard.jsx`, `Skeleton.jsx`,
-   `usePortfolio.js` siguen sin un hallazgo real propio, aunque ya se han
-   mirado por encima).
+   bugs reales aunque menores (incluido uno de backend, encontrado en una
+   relectura manual fuera del ámbito del agente) — así que el régimen de
+   mantenimiento normal parece razonable pero no "agotado": si se repite
+   esta sesión, seguir con una ronda ligera y selectiva (no exhaustiva) en
+   vez de dos rondas completas, pero sin limitarse solo al ámbito que se le
+   dé al agente — una relectura manual propia, aunque sea breve, sigue
+   valiendo la pena. `HeatmapMensual.jsx`, `VistaPorTipo.jsx`, `KpiCard.jsx`,
+   `Skeleton.jsx`, `usePortfolio.js` siguen sin un hallazgo real propio,
+   aunque ya se han mirado por encima (agente + lectura manual esta sesión).
 5. Si el proyecto pasa a usarse de verdad, considerar cifrado o backup
    automático del `localStorage` más allá del botón manual "Exportar JSON".
 
