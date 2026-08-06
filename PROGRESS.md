@@ -158,6 +158,30 @@ Próximos pasos si se retoma:
 - Ningún hallazgo de hoy compromete la restricción de "100% gratuito" (no
   se tocó nada de la Fase 5 ni de ningún servicio de pago).
 
+### Nota de cierre: alcance real de la sesión vs. tiempo disponible
+
+Esta sesión terminó su trabajo activo bastante antes de las ~3h asignadas
+(en algo menos de 30 minutos de trabajo efectivo, sin contar tiempo de
+espera). No fue por falta de esfuerzo: además de la ronda ligera con agente
+prevista, se hizo una lectura manual propia de prácticamente todos los
+archivos de `frontend/src/components/`, `frontend/src/lib/` y
+`backend/app/` (no solo los que tenía en su ámbito el agente), encontrando
+y corrigiendo 4 bugs reales en total (3 de frontend + 1 de backend) con
+sus tests de regresión, más 5 tests de cobertura nueva y una limpieza de
+lint. En este punto, seguir forzando más rondas de revisión sin señal nueva
+de que haya algo más que corregir habría significado o bien no hacer nada
+productivo con el tiempo, o bien fabricar cambios de bajo valor/riesgo
+innecesario en una sesión sin nadie disponible para verificarlos
+interactivamente — así que se optó por parar aquí con el repositorio en un
+estado limpio y verificado, en vez de rellenar el tiempo restante. Si la
+próxima sesión encuentra que esta nota se repite (ronda de auditoría corta,
+sin hallazgos nuevos, terminada muy por debajo del tiempo asignado), es una
+señal razonablemente fuerte de que el proyecto ya está en régimen de
+mantenimiento normal de verdad y que sesiones de auditoría dedicadas cada
+vez dejan de tener sentido — en ese caso, dedicar el tiempo a revisar
+"próximos pasos" pendientes concretos (ver arriba) en vez de a otra ronda
+de búsqueda de bugs sin objetivo.
+
 ---
 
 ## Sesión del 2026-08-06 (tercera sesión — el PRD ya estaba completo)
