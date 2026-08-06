@@ -80,6 +80,15 @@ vez)". Se siguió esa recomendación al pie de la letra.
    estaba cubierto.
 10. **Verificación final**: `npm run test -- --run` (42/42), `npm run build`
     sin errores, `npm run lint` (0 warnings), `pytest` en backend (8/8).
+11. **Se reinstaló `tradingagents` (git, misma v0.3.1) temporalmente** para
+    seguir el "próximo paso" ya apuntado de revisar de vez en cuando su
+    catálogo de modelos de Ollama. Confirmado sin cambios: sigue
+    recomendando `qwen3:latest` (8B) / `gpt-oss:latest` (20B) /
+    `glm-4.7-flash:latest` (30B), y el cliente Ollama sigue requiriendo el
+    sufijo `/v1` en `backend_url` (`openai_client.py`, `ProviderSpec` de
+    `"ollama"`) — el wrapper ya está correcto para ambos, no hizo falta
+    tocar nada. Entorno de venv temporal borrado al terminar (no se deja
+    nada de esto en el repo).
 
 ### En qué se quedó / próxima sesión
 
